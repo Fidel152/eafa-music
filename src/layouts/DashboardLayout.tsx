@@ -1,0 +1,251 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  Home, 
+  Megaphone, 
+  Music, 
+  Guitar, 
+  Users, 
+  LogOut, 
+  Menu, 
+  X,
+  Music2,
+  Bell,
+  BellOff
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../lib/utils';
+import { api } from '../lib/api';
+
+export default function DashboardLayout() {
+  const { user, logout } = useAuth();
+  const { permission, requestPermission, sendNotification } = useNotifications();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const lastAnnouncementId = useRef<string | null>(null);
+
+  const isAdmin = user?.role === 'admin';
+
+  // Poll for new announcements
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    let isPolling = false;
+    
+    const checkNewAnnouncements = async () => {
+      // Don't poll if page is hidden or already polling
+      if (document.visibilityState === 'hidden' || isPolling) return;
+      if (!user) return;
+
+      isPolling = true;
+      try {
+        const announcements = await api.announcements.list();
+        if (announcements && announcements.length > 0) {
+          const newest = announcements[0];
+          
+          // Initial load: just set the last ID
+          if (lastAnnouncementId.current === null) {
+            lastAnnouncementId.current = newest.id;
+            return;
+          }
+
+          // If there's a newer announcement than the last one we saw
+          if (newest.id !== lastAnnouncementId.current) {
+            sendNotification(`Nouvelle annonce : ${newest.title}`, {
+              body: newest.content,
+              tag: 'new-announcement',
+              requireInteraction: true
+            });
+            lastAnnouncementId.current = newest.id;
+          }
+        }
+
+      } catch (error) {
+        // Silent fail for transient fetch errors during polling
+        if (error instanceof Error && error.message.includes('fetch')) {
+          console.debug('Polling skipped: Network unavailable');
+        } else {
+          console.warn('Polling error:', error);
+        }
+      } finally {
+        isPolling = false;
+      }
+    };
+
+    // Wait 2 seconds before first poll to let things settle
+    const initialDelay = setTimeout(() => {
+      checkNewAnnouncements();
+      interval = setInterval(checkNewAnnouncements, 30000);
+    }, 2000);
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (interval) clearInterval(interval);
+    };
+  }, [sendNotification, user]);
+
+  const menuItems = [
+    { name: 'Accueil', icon: Home, path: '/' },
+    { name: 'Annonces', icon: Megaphone, path: '/announcements' },
+    { name: 'Chants', icon: Music, path: '/songs' },
+    { name: 'Instruments', icon: Guitar, path: '/instruments' },
+  ];
+
+  if (isAdmin) {
+    menuItems.push({ name: 'Membres', icon: Users, path: '/members' });
+  }
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const navItemVariants = {
+    hover: { scale: 1.02, x: 5 },
+    tap: { scale: 0.98 },
+  };
+
+  return (
+    <div className="flex h-screen bg-[#f8fafc]">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#002B5B] text-white shadow-xl">
+        <div className="p-6 flex items-center gap-3">
+          <div className="p-2 bg-[#D4AF37] rounded-lg">
+            <Music2 className="text-[#002B5B]" size={24} />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white">EAFA Music</span>
+        </div>
+
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link key={item.path} to={item.path}>
+                <motion.div
+                  variants={navItemVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                    isActive 
+                      ? "bg-[#D4AF37] text-[#002B5B] font-semibold shadow-lg" 
+                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <item.icon size={20} />
+                  <span>{item.name}</span>
+                </motion.div>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-white/10">
+          {/* Notification Quick Access */}
+          <button
+            onClick={requestPermission}
+            className={cn(
+              "flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all text-xs font-bold uppercase tracking-wider",
+              permission === 'granted' 
+                ? "text-emerald-400 bg-emerald-500/10" 
+                : "text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+            )}
+          >
+            {permission === 'granted' ? <Bell size={16} /> : <BellOff size={16} />}
+            <span>{permission === 'granted' ? 'Notifs actives' : 'Activer notifs'}</span>
+          </button>
+
+          <div className="px-4 py-3 mb-4">
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Utilisateur</p>
+            <p className="text-sm font-medium truncate">{user?.displayName || user?.email}</p>
+            <p className="text-[10px] bg-[#D4AF37]/20 text-[#D4AF37] font-bold px-2 py-0.5 rounded inline-block mt-1 uppercase">
+              {user?.role}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 text-slate-300 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all"
+          >
+            <LogOut size={20} />
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Header & Sidebar */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="md:hidden flex items-center justify-between p-4 bg-[#002B5B] text-white">
+          <div className="flex items-center gap-2">
+            <Music2 className="text-[#D4AF37]" size={24} />
+            <span className="font-bold">EAFA Music</span>
+          </div>
+          <button onClick={() => setSidebarOpen(true)}>
+            <Menu size={24} />
+          </button>
+        </header>
+
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSidebarOpen(false)}
+                className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              />
+              <motion.aside
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed inset-y-0 left-0 w-72 bg-[#002B5B] text-white z-50 md:hidden shadow-2xl"
+              >
+                <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Music2 className="text-[#D4AF37]" size={24} />
+                    <span className="text-xl font-bold">EAFA Music</span>
+                  </div>
+                  <button onClick={() => setSidebarOpen(false)}>
+                    <X size={24} />
+                  </button>
+                </div>
+                <nav className="px-4 py-6 space-y-2">
+                  {menuItems.map((item) => {
+                    const isActive = location.pathname === item.path;
+                    return (
+                      <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}>
+                        <div className={cn(
+                          "flex items-center gap-3 px-4 py-3 rounded-xl",
+                          isActive 
+                            ? "bg-[#D4AF37] text-[#002B5B] font-semibold" 
+                            : "text-slate-300 hover:bg-white/10"
+                        )}>
+                          <item.icon size={20} />
+                          <span>{item.name}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-slate-300 mt-8 border-t border-white/10"
+                  >
+                    <LogOut size={20} />
+                    <span>Déconnexion</span>
+                  </button>
+                </nav>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}

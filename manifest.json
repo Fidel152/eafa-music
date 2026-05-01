@@ -1,0 +1,17 @@
+{
+  "name": "EAFA Music",
+  "short_name": "EAFA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#002B5B",
+  "theme_color": "#002B5B",
+  "description": "Application répertoire de chants et annonces EAFA",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
