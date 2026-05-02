@@ -67,8 +67,7 @@ async function startServer() {
     console.log(`Admin ${adminName} created!`);
   }
 
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.use(express.json());
 
   // API Routes
   
@@ -179,11 +178,13 @@ async function startServer() {
     res.json({ id, name });
   });
 
+  // Delete instrument
   app.delete("/api/instruments/:id", (req, res) => {
     db.prepare("DELETE FROM instruments WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   });
 
+  // Update instrument
   app.put("/api/instruments/:id", (req, res) => {
     const { name, category, quantity, condition, imageUrl } = req.body;
     db.prepare("UPDATE instruments SET name = ?, category = ?, quantity = ?, condition = ?, imageUrl = ? WHERE id = ?")
