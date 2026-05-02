@@ -127,6 +127,7 @@ export default function Dashboard() {
           icon={Megaphone} 
           color="bg-blue-500" 
           variants={itemVariants}
+          to="/announcements"
         />
         <StatCard 
           title="Répertoire Chants" 
@@ -134,6 +135,7 @@ export default function Dashboard() {
           icon={Music} 
           color="bg-[#D4AF37]" 
           variants={itemVariants}
+          to="/songs"
         />
         <StatCard 
           title="Instruments" 
@@ -141,6 +143,7 @@ export default function Dashboard() {
           icon={Guitar} 
           color="bg-purple-500" 
           variants={itemVariants}
+          to="/instruments"
         />
       </motion.div>
 
@@ -214,19 +217,24 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, color, variants }: any) {
+function StatCard({ title, value, icon: Icon, color, variants, to }: any) {
   return (
-    <motion.div 
-      variants={variants}
-      className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow"
-    >
-      <div className={cn("p-4 rounded-2xl text-white shadow-lg", color)}>
-        <Icon size={24} />
-      </div>
-      <div>
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
-        <p className="text-3xl font-black text-[#002B5B]">{value}</p>
-      </div>
-    </motion.div>
+    <Link to={to} className="block group decoration-none">
+      <motion.div 
+        variants={variants}
+        className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-all group-hover:border-[#D4AF37]/30"
+      >
+        <div className={cn("p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-110", color)}>
+          <Icon size={24} />
+        </div>
+        <div>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-3xl font-black text-[#002B5B]">{value}</p>
+            <ChevronRight className="text-slate-300 group-hover:text-[#D4AF37] transition-colors" size={20} />
+          </div>
+        </div>
+      </motion.div>
+    </Link>
   );
 }
