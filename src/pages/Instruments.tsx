@@ -11,7 +11,10 @@ import {
   Edit2, 
   X, 
   Guitar,
-  Activity
+  Activity,
+  Camera,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,6 +26,7 @@ export default function Instruments() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -52,6 +56,24 @@ export default function Instruments() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("L'image est trop lourde (max 2Mo)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setFormData({ ...formData, imageUrl: base64String });
+      setImagePreview(base64String);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,9 +123,11 @@ export default function Instruments() {
         condition: inst.condition,
         imageUrl: inst.imageUrl || ''
       });
+      setImagePreview(inst.imageUrl || null);
     } else {
       setEditingId(null);
       setFormData({ name: '', quantity: 1, condition: 'Bon état', imageUrl: '' });
+      setImagePreview(null);
     }
     setIsModalOpen(true);
   };
@@ -270,7 +294,7 @@ export default function Instruments() {
                 <button onClick={closeModal}><X size={24} /></button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nom de l'instrument</label>
                   <input 
@@ -288,7 +312,7 @@ export default function Instruments() {
                     <input 
                       type="number" required min="1"
                       value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#D4AF37]/20 outline-none"
                     />
                   </div>
@@ -308,19 +332,76 @@ export default function Instruments() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">URL de la photo (optionnel)</label>
-                  <input 
-                    type="url"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#D4AF37]/20 outline-none"
-                    placeholder="https://..."
-                  />
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Photo de l'instrument</label>
+                  <div className="flex flex-col gap-4">
+                    {imagePreview ? (
+                      <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                        <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setImagePreview(null);
+                            setFormData({ ...formData, imageUrl: '' });
+                          }}
+                          className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className="flex flex-col items-center justify-center gap-3 h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-[#D4AF37]/50 cursor-pointer transition-all group">
+                          <div className="p-3 bg-white rounded-xl shadow-sm text-slate-400 group-hover:text-[#D4AF37] transition-colors">
+                            <Upload size={20} />
+                          </div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-[#D4AF37] transition-colors">Bibliothèque</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                        </label>
+
+                        <label className="flex flex-col items-center justify-center gap-3 h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-[#D4AF37]/50 cursor-pointer transition-all group">
+                          <div className="p-3 bg-white rounded-xl shadow-sm text-slate-400 group-hover:text-[#D4AF37] transition-colors">
+                            <Camera size={20} />
+                          </div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-[#D4AF37] transition-colors">Prendre Photo</span>
+                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+                        </label>
+                      </div>
+                    )}
+                    
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                        <ImageIcon size={16} />
+                      </div>
+                      <input 
+                        type="url"
+                        value={formData.imageUrl.startsWith('data:') ? 'Image chargée localement' : formData.imageUrl}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, imageUrl: val });
+                          if (val.startsWith('http')) setImagePreview(val);
+                        }}
+                        disabled={formData.imageUrl.startsWith('data:')}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-[#D4AF37]/20 outline-none text-sm disabled:opacity-50"
+                        placeholder="Ou coller une URL https://..."
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={closeModal} className="flex-1 py-4 font-bold bg-slate-100 rounded-xl">Annuler</button>
-                  <button type="submit" className="flex-2 py-4 font-black bg-[#D4AF37] text-[#002B5B] rounded-xl shadow-lg">Soumettre</button>
+                <div className="flex gap-4 pt-4 sticky bottom-0 bg-white pb-2">
+                  <button 
+                    type="button" 
+                    onClick={closeModal} 
+                    className="flex-1 px-6 py-3 border border-slate-100 rounded-xl font-black text-[#002B5B] uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-2 px-6 py-3 bg-[#D4AF37] text-white rounded-xl font-black uppercase tracking-widest hover:bg-[#B8962E] shadow-lg shadow-[#D4AF37]/20 transition-all active:scale-95"
+                  >
+                    {editingId ? 'Enregistrer' : 'Ajouter'}
+                  </button>
                 </div>
               </form>
             </motion.div>
