@@ -112,8 +112,13 @@ export default function DashboardLayout() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-[#002B5B] text-white shadow-xl">
         <div className="p-6 flex items-center gap-3">
-          <div className="p-2 bg-[#D4AF37] rounded-lg">
-            <Music2 className="text-[#002B5B]" size={24} />
+          <div className="h-10 w-10 flex items-center justify-center bg-white/10 rounded-xl shadow-[0_0_15px_rgba(212,175,55,0.3)] border border-[#D4AF37]/30 p-2 overflow-hidden ring-1 ring-[#D4AF37]/20">
+            <img 
+              src="https://img.icons8.com/ios-filled/512/D4AF37/music.png" 
+              alt="EAFA Music" 
+              className="w-full h-full object-contain filter drop-shadow-[0_0_2px_rgba(212,175,55,0.5)]"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <span className="text-xl font-bold tracking-tight text-white">EAFA Music</span>
         </div>
@@ -178,7 +183,14 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between p-4 bg-[#002B5B] text-white">
           <div className="flex items-center gap-2">
-            <Music2 className="text-[#D4AF37]" size={24} />
+            <div className="h-8 w-8 bg-white/10 rounded-lg p-1.5 overflow-hidden border border-[#D4AF37]/30 shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+              <img 
+                src="https://img.icons8.com/ios-filled/512/D4AF37/music.png" 
+                alt="Logo" 
+                className="w-full h-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
             <span className="font-bold">EAFA Music</span>
           </div>
           <button onClick={() => setSidebarOpen(true)}>
@@ -205,7 +217,14 @@ export default function DashboardLayout() {
               >
                 <div className="p-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Music2 className="text-[#D4AF37]" size={24} />
+                    <div className="h-10 w-10 bg-white/10 rounded-xl p-2 overflow-hidden border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
+                      <img 
+                        src="https://img.icons8.com/ios-filled/512/D4AF37/music.png" 
+                        alt="Logo" 
+                        className="w-full h-full object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                     <span className="text-xl font-bold">EAFA Music</span>
                   </div>
                   <button onClick={() => setSidebarOpen(false)}>
