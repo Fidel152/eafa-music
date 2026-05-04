@@ -1,7 +1,7 @@
 /**
  * Frontend API client using Supabase
  */
-import { Member, Song, Announcement, Instrument } from '../types';
+import { Member, Song, Announcement, Instrument, Rehearsal, Attendance, Comment, Message } from '../types';
 import { supabase } from './supabase';
 
 export const api = {
@@ -46,7 +46,10 @@ export const api = {
         voiceType: m.voice_type,
         instrument: m.instrument,
         active: m.active,
-        joinedAt: m.joined_at
+        joinedAt: m.joined_at,
+        avatarUrl: m.avatar_url,
+        phoneNumber: m.phone_number,
+        lastSeen: m.last_seen
       }));
     },
     create: async (member: Partial<Member>) => {
@@ -56,7 +59,9 @@ export const api = {
         role: member.role,
         voice_type: member.voiceType,
         instrument: member.instrument,
-        active: member.active
+        active: member.active,
+        avatar_url: member.avatarUrl,
+        phone_number: member.phoneNumber
       };
       
       const { data, error } = await supabase
@@ -84,6 +89,9 @@ export const api = {
       if (member.voiceType !== undefined) dbMember.voice_type = member.voiceType;
       if (member.instrument !== undefined) dbMember.instrument = member.instrument;
       if (member.active !== undefined) dbMember.active = member.active;
+      if (member.avatarUrl !== undefined) dbMember.avatar_url = member.avatarUrl;
+      if (member.phoneNumber !== undefined) dbMember.phone_number = member.phoneNumber;
+      if (member.lastSeen !== undefined) dbMember.last_seen = member.lastSeen;
 
       const { data, error } = await supabase
         .from('members')
@@ -94,6 +102,13 @@ export const api = {
       
       if (error) throw error;
       return data;
+    },
+    updatePresence: async (id: string) => {
+      const { error } = await supabase
+        .from('members')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
     }
   },
   songs: {
@@ -292,6 +307,191 @@ export const api = {
       
       if (error) throw error;
       return data;
+    }
+  },
+  rehearsals: {
+    list: async (): Promise<Rehearsal[]> => {
+      const { data, error } = await supabase
+        .from('rehearsals')
+        .select('*')
+        .order('date', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(r => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        date: r.date,
+        location: r.location,
+        createdAt: r.created_at
+      }));
+    },
+    create: async (rehearsal: Partial<Rehearsal>) => {
+      const { data, error } = await supabase
+        .from('rehearsals')
+        .insert([{
+          title: rehearsal.title,
+          description: rehearsal.description,
+          date: rehearsal.date,
+          location: rehearsal.location
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    delete: async (id: string) => {
+      const { error } = await supabase.from('rehearsals').delete().eq('id', id);
+      if (error) throw error;
+      return { success: true };
+    }
+  },
+  attendance: {
+    listForRehearsal: async (rehearsalId: string): Promise<Attendance[]> => {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('rehearsal_id', rehearsalId);
+      if (error) throw error;
+      return (data || []).map(a => ({
+        id: a.id,
+        rehearsalId: a.rehearsal_id,
+        memberId: a.member_id,
+        status: a.status,
+        updatedAt: a.updated_at
+      }));
+    },
+    update: async (rehearsalId: string, memberId: string, status: string) => {
+      // First try to find existing record to be safe
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('rehearsal_id', rehearsalId)
+        .eq('member_id', memberId)
+        .maybeSingle();
+
+      if (existing) {
+        const { data, error } = await supabase
+          .from('attendance')
+          .update({ 
+            status: status,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from('attendance')
+          .insert([{
+            rehearsal_id: rehearsalId,
+            member_id: memberId,
+            status: status
+          }])
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    }
+  },
+  comments: {
+    list: async (targetId: string): Promise<Comment[]> => {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('target_id', targetId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(c => ({
+        id: c.id,
+        targetId: c.target_id,
+        targetType: c.target_type,
+        memberId: c.member_id,
+        memberName: c.member_name,
+        content: c.content,
+        createdAt: c.created_at,
+        parentId: c.parent_id
+      }));
+    },
+    create: async (comment: Partial<Comment>) => {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([{
+          target_id: comment.targetId,
+          target_type: comment.targetType,
+          member_id: comment.memberId,
+          member_name: comment.memberName,
+          content: comment.content,
+          parent_id: comment.parentId
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    delete: async (id: string) => {
+      const { error } = await supabase.from('comments').delete().eq('id', id);
+      if (error) throw error;
+      return { success: true };
+    }
+  },
+  messages: {
+    listConversations: async (userId: string): Promise<Message[]> => {
+      // This is a simplified list of latest messages for conversation list
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(m => ({
+        id: m.id,
+        senderId: m.sender_id,
+        receiverId: m.receiver_id,
+        content: m.content,
+        read: m.read,
+        createdAt: m.created_at
+      }));
+    },
+    listThread: async (userId: string, otherId: string): Promise<Message[]> => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(m => ({
+        id: m.id,
+        senderId: m.sender_id,
+        receiverId: m.receiver_id,
+        content: m.content,
+        read: m.read,
+        createdAt: m.created_at
+      }));
+    },
+    send: async (message: Partial<Message>) => {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([{
+          sender_id: message.senderId,
+          receiver_id: message.receiverId,
+          content: message.content
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    markAsRead: async (userId: string, senderId: string) => {
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('receiver_id', userId)
+        .eq('sender_id', senderId)
+        .eq('read', false);
+      if (error) throw error;
     }
   }
 };

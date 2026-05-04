@@ -8,6 +8,9 @@ export interface Member {
   active: boolean;
   voiceType?: string;
   instrument?: string;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  lastSeen?: any;
 }
 
 export interface Announcement {
@@ -41,9 +44,46 @@ export interface Instrument {
   lastMaintenance: any;
 }
 
+export interface Rehearsal {
+  id: string;
+  title: string;
+  description?: string;
+  date: any;
+  location: string;
+  createdAt: any;
+}
+
+export interface Attendance {
+  id: string;
+  rehearsalId: string;
+  memberId: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  updatedAt: any;
+}
+
+export interface Comment {
+  id: string;
+  targetId: string;
+  targetType: 'announcement' | 'song';
+  memberId: string;
+  memberName: string;
+  content: string;
+  createdAt: any;
+  parentId?: string;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  read: boolean;
+  createdAt: any;
+}
+
 export interface AuthState {
   user: {
-    uid: string;
+    id: string;
     email?: string | null;
     displayName?: string | null;
     role: UserRole;

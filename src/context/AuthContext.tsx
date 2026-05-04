@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 interface AuthContextType extends AuthState {
   login: (name: string) => Promise<{ success: boolean; role?: UserRole }>;
   logout: () => Promise<void>;
+  updateUser: (updates: Partial<AuthState['user']>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,8 +21,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedUser = localStorage.getItem('app_user');
     if (savedUser) {
       try {
+        const user = JSON.parse(savedUser);
+        // Migration: Ensure user has 'id' even if stored as 'uid'
+        if (user && user.uid && !user.id) {
+          user.id = user.uid;
+        }
         setState({
-          user: JSON.parse(savedUser),
+          user: user,
           loading: false,
         });
       } catch (e) {
@@ -42,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.auth.loginByName(name);
       if (response.success) {
         const user = {
-          uid: response.user.id,
+          id: response.user.id,
           displayName: response.user.displayName,
           role: response.user.role as UserRole,
         };
@@ -63,8 +69,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setState({ user: null, loading: false });
   };
 
+  const updateUser = (updates: any) => {
+    setState(prev => {
+      if (!prev.user) return prev;
+      const newUser = { ...prev.user, ...updates };
+      localStorage.setItem('app_user', JSON.stringify(newUser));
+      return { ...prev, user: newUser };
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ ...state, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

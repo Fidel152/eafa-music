@@ -11,13 +11,17 @@ import {
   X,
   Music2,
   Bell,
-  BellOff
+  BellOff,
+  Calendar,
+  Send,
+  User as UserIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
@@ -29,29 +33,26 @@ export default function DashboardLayout() {
 
   const isAdmin = user?.role === 'admin';
 
-  // Poll for new announcements
+  // Real-time announcements subscription
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let isPolling = false;
-    
-    const checkNewAnnouncements = async () => {
-      // Don't poll if page is hidden or already polling
-      if (document.visibilityState === 'hidden' || isPolling) return;
-      if (!user) return;
+    if (!user) return;
 
-      isPolling = true;
-      try {
-        const announcements = await api.announcements.list();
-        if (announcements && announcements.length > 0) {
-          const newest = announcements[0];
-          
-          // Initial load: just set the last ID
-          if (lastAnnouncementId.current === null) {
-            lastAnnouncementId.current = newest.id;
-            return;
-          }
+    // Initial check for latest ID
+    api.announcements.list()
+      .then(list => {
+        if (list && list.length > 0) {
+          lastAnnouncementId.current = list[0].id;
+        }
+      })
+      .catch(err => console.error("Could not fetch initial announcements:", err));
 
-          // If there's a newer announcement than the last one we saw
+    const channel = supabase
+      .channel('public:announcements')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'announcements' },
+        (payload) => {
+          const newest = payload.new as any;
           if (newest.id !== lastAnnouncementId.current) {
             sendNotification(`Nouvelle annonce : ${newest.title}`, {
               body: newest.content,
@@ -61,41 +62,23 @@ export default function DashboardLayout() {
             lastAnnouncementId.current = newest.id;
           }
         }
-
-      } catch (error) {
-        // Silent fail for transient fetch errors during polling
-        if (error instanceof Error && error.message.includes('fetch')) {
-          console.debug('Polling skipped: Network unavailable');
-        } else {
-          console.warn('Polling error:', error);
-        }
-      } finally {
-        isPolling = false;
-      }
-    };
-
-    // Wait 2 seconds before first poll to let things settle
-    const initialDelay = setTimeout(() => {
-      checkNewAnnouncements();
-      interval = setInterval(checkNewAnnouncements, 30000);
-    }, 2000);
+      )
+      .subscribe();
 
     return () => {
-      clearTimeout(initialDelay);
-      if (interval) clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, [sendNotification, user]);
 
   const menuItems = [
     { name: 'Accueil', icon: Home, path: '/' },
+    { name: 'Répétitions', icon: Calendar, path: '/rehearsals' },
     { name: 'Annonces', icon: Megaphone, path: '/announcements' },
     { name: 'Chants', icon: Music, path: '/songs' },
     { name: 'Instruments', icon: Guitar, path: '/instruments' },
+    { name: 'Messagerie', icon: Send, path: '/messages', badge: true },
+    { name: 'Membres', icon: Users, path: '/members' },
   ];
-
-  if (isAdmin) {
-    menuItems.push({ name: 'Membres', icon: Users, path: '/members' });
-  }
 
   const handleLogout = async () => {
     await logout();
@@ -125,7 +108,27 @@ export default function DashboardLayout() {
 
         <nav className="flex-1 px-4 py-6 space-y-2">
           {menuItems.map((item) => {
+            const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const [unreadCount, setUnreadCount] = useState(0);
+
+            useEffect(() => {
+              if (item.badge && user) {
+                const checkMessages = async () => {
+                  try {
+                    const messages = await api.messages.listConversations(user.id);
+                    const unread = messages.filter(m => m.receiverId === user.id && !m.read).length;
+                    setUnreadCount(unread);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                };
+                checkMessages();
+                const interval = setInterval(checkMessages, 10000);
+                return () => clearInterval(interval);
+              }
+            }, [item.badge, user]);
+
             return (
               <Link key={item.path} to={item.path}>
                 <motion.div
@@ -133,47 +136,60 @@ export default function DashboardLayout() {
                   whileHover="hover"
                   whileTap="tap"
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative",
                     isActive 
                       ? "bg-[#D4AF37] text-[#002B5B] font-semibold shadow-lg" 
                       : "text-slate-300 hover:bg-white/10 hover:text-white"
                   )}
                 >
-                  <item.icon size={20} />
+                  <Icon size={20} />
                   <span>{item.name}</span>
+                  {item.badge && unreadCount > 0 && (
+                    <span className="absolute right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#002B5B] animate-pulse" />
+                  )}
                 </motion.div>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          {/* Notification Quick Access */}
+        <div className="p-4 border-t border-white/10 space-y-1 bg-[#001f41]">
           <button
             onClick={requestPermission}
             className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all text-xs font-bold uppercase tracking-wider",
+              "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all text-xs font-black uppercase tracking-widest",
               permission === 'granted' 
-                ? "text-emerald-400 bg-emerald-500/10" 
-                : "text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+                ? "text-emerald-400 hover:bg-emerald-500/10" 
+                : "text-amber-400 hover:bg-amber-500/10"
             )}
           >
-            {permission === 'granted' ? <Bell size={16} /> : <BellOff size={16} />}
-            <span>{permission === 'granted' ? 'Notifs actives' : 'Activer notifs'}</span>
+            {permission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
+            <span>Notification : {permission === 'granted' ? 'ON' : 'OFF'}</span>
           </button>
 
-          <div className="px-4 py-3 mb-4">
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Utilisateur</p>
-            <p className="text-sm font-medium truncate">{user?.displayName || user?.email}</p>
-            <p className="text-[10px] bg-[#D4AF37]/20 text-[#D4AF37] font-bold px-2 py-0.5 rounded inline-block mt-1 uppercase">
-              {user?.role}
-            </p>
-          </div>
+          <Link 
+            to="/profile" 
+            className={cn(
+              "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all",
+              location.pathname === '/profile' 
+                ? "bg-[#D4AF37] text-[#002B5B] font-black shadow-lg" 
+                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            <UserIcon size={20} />
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-black truncate leading-tight uppercase tracking-tight">Utilisateur : {user?.displayName?.split(' ')[0] || 'Moi'}</p>
+              <p className="text-[10px] uppercase opacity-70 tracking-widest font-bold">
+                {user?.role === 'admin' ? 'Coordinateur' : 'Membre'}
+              </p>
+            </div>
+          </Link>
+
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-slate-300 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all"
+            className="flex items-center gap-3 w-full px-4 py-3.5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all text-xs font-black uppercase tracking-widest"
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
             <span>Déconnexion</span>
           </button>
         </div>
@@ -233,17 +249,38 @@ export default function DashboardLayout() {
                 </div>
                 <nav className="px-4 py-6 space-y-2">
                   {menuItems.map((item) => {
+                    const Icon = item.icon;
                     const isActive = location.pathname === item.path;
+                    const [unreadCount, setUnreadCount] = useState(0);
+
+                    useEffect(() => {
+                      if (item.badge && user) {
+                        const checkMessages = async () => {
+                          try {
+                            const messages = await api.messages.listConversations(user.id);
+                            const unread = messages.filter(m => m.receiverId === user.id && !m.read).length;
+                            setUnreadCount(unread);
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        };
+                        checkMessages();
+                      }
+                    }, [item.badge, user]);
+
                     return (
                       <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}>
                         <div className={cn(
-                          "flex items-center gap-3 px-4 py-3 rounded-xl",
+                          "flex items-center gap-3 px-4 py-3 rounded-xl relative",
                           isActive 
                             ? "bg-[#D4AF37] text-[#002B5B] font-semibold" 
                             : "text-slate-300 hover:bg-white/10"
                         )}>
-                          <item.icon size={20} />
+                          <Icon size={20} />
                           <span>{item.name}</span>
+                          {item.badge && unreadCount > 0 && (
+                            <span className="absolute right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#002B5B]" />
+                          )}
                         </div>
                       </Link>
                     );

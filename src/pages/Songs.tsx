@@ -13,6 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import CommentSection from '../components/CommentSection';
 
 export default function Songs() {
   const { user } = useAuth();
@@ -273,6 +274,10 @@ export default function Songs() {
                   <pre className="font-mono text-lg md:text-xl whitespace-pre-wrap leading-loose tracking-wider">
                     {selectedSong.chords || 'Non spécifiés'}
                   </pre>
+                </div>
+
+                <div className="md:col-span-2">
+                  <CommentSection targetId={selectedSong.id} targetType="song" />
                 </div>
               </div>
             </motion.div>

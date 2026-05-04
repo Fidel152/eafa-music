@@ -9,6 +9,9 @@ import Announcements from './pages/Announcements';
 import Songs from './pages/Songs';
 import Instruments from './pages/Instruments';
 import Members from './pages/Members';
+import Rehearsals from './pages/Rehearsals';
+import Chat from './pages/Chat';
+import Profile from './pages/Profile';
 import DashboardLayout from './layouts/DashboardLayout';
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
@@ -27,7 +30,10 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
   return <>{children}</>;
 };
 
+import { usePresence } from './hooks/usePresence';
+
 function AppRoutes() {
+  usePresence();
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -38,14 +44,13 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<Dashboard />} />
+        <Route path="rehearsals" element={<Rehearsals />} />
         <Route path="announcements" element={<Announcements />} />
         <Route path="songs" element={<Songs />} />
         <Route path="instruments" element={<Instruments />} />
-        <Route path="members" element={
-          <ProtectedRoute adminOnly>
-            <Members />
-          </ProtectedRoute>
-        } />
+        <Route path="members" element={<Members />} />
+        <Route path="messages" element={<Chat />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

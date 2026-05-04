@@ -14,9 +14,10 @@ import {
   Clock,
   Image as ImageIcon
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
+import CommentSection from '../components/CommentSection';
 
 export default function Announcements() {
   const { user } = useAuth();
@@ -60,10 +61,22 @@ export default function Announcements() {
   const formatDate = (date: any) => {
     if (!date) return '...';
     try {
-      const d = date.toDate ? date.toDate() : new Date(date);
-      return format(d, 'd MMMM yyyy', { locale: fr });
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return 'Date...';
+      return format(d, 'd MMMM yyyy à HH:mm', { locale: fr });
     } catch (e) {
-      return 'Date invalide';
+      return '';
+    }
+  };
+
+  const formatDateRelative = (date: any) => {
+    if (!date) return '...';
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return formatDistanceToNow(d, { addSuffix: true, locale: fr });
+    } catch (e) {
+      return '';
     }
   };
 
@@ -211,7 +224,7 @@ export default function Announcements() {
                 <div className="p-6 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
                     <Clock size={12} />
-                    {formatDate(ann.createdAt)}
+                    {formatDateRelative(ann.createdAt)}
                   </div>
                   
                   <h3 className="text-xl font-bold text-[#002B5B] mb-3 line-clamp-1">{ann.title}</h3>
@@ -428,6 +441,9 @@ export default function Announcements() {
                     {viewingAnnouncement.content}
                   </p>
                 </div>
+
+                {/* Comment Section */}
+                <CommentSection targetId={viewingAnnouncement.id} targetType="announcement" />
 
                 <div className="mt-12 pt-8 border-t border-slate-100 flex justify-center">
                   <button 

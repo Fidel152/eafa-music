@@ -12,14 +12,18 @@ import {
   Users,
   Shield,
   User,
-  Crown
+  Crown,
+  MessageCircle,
+  Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Members() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +38,8 @@ export default function Members() {
 
   useEffect(() => {
     loadMembers();
+    const interval = setInterval(loadMembers, 15000); // Refresh list every 15s for online status
+    return () => clearInterval(interval);
   }, []);
 
   const loadMembers = async () => {
@@ -42,21 +48,23 @@ export default function Members() {
       setMembers(data);
     } catch (error: any) {
       console.error("Load members error:", error);
-      let message = error instanceof Error ? error.message : String(error);
-      try {
-        const parsed = JSON.parse(message);
-        if (parsed.error) message = parsed.error;
-      } catch (e) {}
-      toast.error("Erreur de chargement", { description: message });
+      toast.error("Erreur de chargement");
     } finally {
       setLoading(false);
     }
   };
 
+  const isOnline = (lastSeen: any) => {
+    if (!lastSeen) return false;
+    const now = new Date();
+    const seen = new Date(lastSeen);
+    return now.getTime() - seen.getTime() < 120000;
+  };
+
   const formatDate = (date: any) => {
     if (!date) return '...';
     try {
-      const d = date.toDate ? date.toDate() : new Date(date);
+      const d = new Date(date);
       return format(d, 'd MMM yyyy', { locale: fr });
     } catch (e) {
       return 'Date invalide';
@@ -68,7 +76,6 @@ export default function Members() {
     if (!isAdmin) return;
 
     try {
-      // Check if already exists
       if (members.some(m => m.fullName.toLowerCase() === formData.fullName.toLowerCase())) {
         toast.error('Ce membre existe déjà');
         return;
@@ -82,26 +89,22 @@ export default function Members() {
       loadMembers();
       closeModal();
     } catch (error: any) {
-      console.error("Submit member error:", error);
-      toast.error(`Erreur lors de l’ajout: ${error.message}`);
+      toast.error(`Erreur lors de l’ajout`);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!isAdmin) return;
-    
-    // Protection: l'admin ne peut pas se supprimer lui-même par erreur
-    if (id === user?.uid) {
-      toast.error("Vous ne pouvez pas supprimer votre propre compte administrateur.");
+    if (id === user?.id) {
+      toast.error("Vous ne pouvez pas supprimer votre propre compte.");
       return;
     }
 
     try {
       await api.members.delete(id);
-      toast.success('Membre retiré de la base');
+      toast.success('Membre retiré');
       loadMembers();
     } catch (error) {
-      console.error("Delete error:", error);
       toast.error('Erreur lors de la suppression');
     }
   };
@@ -121,9 +124,9 @@ export default function Members() {
         <div>
           <h1 className="text-3xl font-black text-[#002B5B] tracking-tight flex items-center gap-3">
             <Users className="text-[#D4AF37]" size={32} />
-            Gestion des Membres
+            Espace Membres
           </h1>
-          <p className="text-slate-500 font-medium tracking-tight">Autorisez l'accès au portail EAFA Music.</p>
+          <p className="text-slate-500 font-medium tracking-tight">Découvrez les membres de la chorale et discutez avec eux.</p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -131,7 +134,7 @@ export default function Members() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text"
-              placeholder="Rechercher un nom..."
+              placeholder="Rechercher un membre..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 w-full md:w-64 outline-none focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
@@ -143,75 +146,102 @@ export default function Members() {
               className="bg-[#002B5B] text-white font-black px-6 py-2.5 rounded-xl flex items-center gap-2 hover:bg-[#003d82] transition-colors shadow-lg"
             >
               <Plus size={20} />
-              Ajouter un membre
+              Ajouter
             </button>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-        <table className="w-full text-left min-w-[600px]">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              <th className="px-4 md:px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Nom Complet</th>
-              <th className="px-4 md:px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Rôle</th>
-              <th className="px-4 md:px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Date d'ajout</th>
-              <th className="px-4 md:px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading ? (
-              [1, 2, 3].map(i => (
-                <tr key={i} className="animate-pulse">
-                  <td colSpan={4} className="px-4 md:px-8 py-6"><div className="h-4 bg-slate-100 rounded w-1/2" /></td>
-                </tr>
-              ))
-            ) : filteredMembers.length > 0 ? (
-              filteredMembers.map(m => (
-                <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 md:px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#002B5B] text-[#D4AF37] rounded-full flex items-center justify-center font-bold flex-shrink-0">
-                        {m.fullName.charAt(0)}
-                      </div>
-                      <span className="font-bold text-[#002B5B] truncate max-w-[150px] md:max-w-none">{m.fullName}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 md:px-8 py-5">
-                    <div className="flex items-center gap-2">
-                       {m.role === 'admin' ? (
-                        <span className="px-3 py-1 bg-purple-100 text-purple-700 text-[10px] font-black uppercase rounded-full flex items-center gap-1 whitespace-nowrap">
-                          <Crown size={12} /> Admin
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-black uppercase rounded-full flex items-center gap-1 whitespace-nowrap">
-                          <User size={12} /> Membre
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 md:px-8 py-5 text-sm text-slate-500 font-medium whitespace-nowrap">
-                    {formatDate(m.joinedAt)}
-                  </td>
-                  <td className="px-4 md:px-8 py-5 text-right">
-                    {isAdmin && (
-                      <button 
-                        onClick={() => handleDelete(m.id)}
-                        className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <AnimatePresence mode="popLayout">
+          {filteredMembers.map(m => (
+            <motion.div
+              key={m.id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all relative group"
+            >
+              {isOnline(m.lastSeen) && (
+                <div className="absolute top-6 right-6 flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-full border border-green-100">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-black text-green-600 uppercase">En ligne</span>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 bg-[#002B5B] text-[#D4AF37] rounded-full flex items-center justify-center text-2xl font-black border-4 border-slate-50 shadow-sm overflow-hidden">
+                    {m.avatarUrl ? (
+                      <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      m.fullName.charAt(0)
                     )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={4} className="px-4 md:px-8 py-12 text-center text-slate-400">Aucun membre trouvé</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-black text-[#002B5B] text-lg leading-tight">{m.fullName}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    {m.role === 'admin' ? (
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
+                        <Crown size={10} /> Admin
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
+                        <User size={10} /> Membre
+                      </span>
+                    )}
+                    {m.voiceType && (
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">{m.voiceType}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-slate-50 grid grid-cols-2 gap-4">
+                {m.id !== user?.id ? (
+                  <button 
+                    onClick={() => navigate('/messages')}
+                    className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-[#002B5B] rounded-xl text-xs font-black hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-all"
+                  >
+                    <MessageCircle size={16} /> Discuter
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => navigate('/profile')}
+                    className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-slate-400 rounded-xl text-xs font-black transition-all"
+                  >
+                    Mon Profil
+                  </button>
+                )}
+                
+                {m.phoneNumber ? (
+                  <a 
+                    href={`tel:${m.phoneNumber}`}
+                    className="flex items-center justify-center gap-2 py-2.5 bg-[#002B5B] text-white rounded-xl text-xs font-black hover:bg-[#003d82] transition-all"
+                  >
+                    <Phone size={16} /> Appeler
+                  </a>
+                ) : (
+                  <div className="flex items-center justify-center py-2.5 bg-slate-50 text-slate-300 rounded-xl text-[10px] font-bold italic">
+                    Pas de numéro
+                  </div>
+                )}
+              </div>
+
+              {isAdmin && m.id !== user?.id && (
+                <button 
+                  onClick={() => handleDelete(m.id)}
+                  className="absolute bottom-24 right-6 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                  title="Supprimer ce membre"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Add Member Modal */}

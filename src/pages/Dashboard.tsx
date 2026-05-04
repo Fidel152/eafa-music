@@ -23,7 +23,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({
     announcements: 0,
     songs: 0,
-    instruments: 0
+    instruments: 0,
+    rehearsals: 0
   });
   const [latestAnnouncement, setLatestAnnouncement] = useState<Announcement | null>(null);
 
@@ -33,23 +34,27 @@ export default function Dashboard() {
         const results = await Promise.allSettled([
           api.announcements.list(),
           api.songs.list(),
-          api.instruments.list()
+          api.instruments.list(),
+          api.rehearsals.list()
         ]);
 
-        const [annsRes, songsRes, instsRes] = results;
+        const [annsRes, songsRes, instsRes, rehRes] = results;
 
         if (annsRes.status === 'rejected') console.error("Annonces load error:", annsRes.reason);
         if (songsRes.status === 'rejected') console.error("Songs load error:", songsRes.reason);
         if (instsRes.status === 'rejected') console.error("Instruments load error:", instsRes.reason);
+        if (rehRes.status === 'rejected') console.error("Rehearsals load error:", rehRes.reason);
 
         const anns = annsRes.status === 'fulfilled' ? annsRes.value : [];
         const songs = songsRes.status === 'fulfilled' ? songsRes.value : [];
         const insts = instsRes.status === 'fulfilled' ? instsRes.value : [];
+        const rehs = rehRes.status === 'fulfilled' ? rehRes.value : [];
 
         setStats({
           announcements: anns.length,
           songs: songs.length,
-          instruments: insts.length
+          instruments: insts.length,
+          rehearsals: rehs.length
         });
 
         if (anns.length > 0) {
@@ -90,26 +95,26 @@ export default function Dashboard() {
   const formatDate = (date: any) => {
     if (!date) return '...';
     try {
-      // Handle Firestore Timestamp
-      const d = date.toDate ? date.toDate() : new Date(date);
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '...';
       return format(d, 'd MMM yyyy', { locale: fr });
     } catch (e) {
-      return 'Date invalide';
+      return '';
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-[#002B5B] tracking-tight">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#002B5B] tracking-tight">
             Shalom, <span className="text-[#D4AF37]">{user?.displayName || 'Ami'}</span>
           </h1>
-          <p className="text-slate-500 font-medium">Bienvenue sur le portail EAFA Music.</p>
+          <p className="text-slate-500 font-medium text-sm sm:text-base">Bienvenue sur le portail EAFA Music.</p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
-          <Calendar className="text-[#D4AF37]" size={20} />
-          <span className="text-sm font-bold text-slate-700">
+        <div className="flex items-center justify-center sm:justify-start gap-2 bg-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 self-center sm:self-auto">
+          <Calendar className="text-[#D4AF37] sm:w-5 sm:h-5" size={16} />
+          <span className="text-[10px] sm:text-sm font-bold text-slate-700">
             {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
           </span>
         </div>
@@ -119,7 +124,7 @@ export default function Dashboard() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
       >
         <StatCard 
           title="Annonces" 
@@ -130,7 +135,15 @@ export default function Dashboard() {
           to="/announcements"
         />
         <StatCard 
-          title="Répertoire Chants" 
+          title="Répétitions" 
+          value={stats.rehearsals} 
+          icon={Calendar} 
+          color="bg-amber-500" 
+          variants={itemVariants}
+          to="/rehearsals"
+        />
+        <StatCard 
+          title="Chants" 
           value={stats.songs} 
           icon={Music} 
           color="bg-[#D4AF37]" 
@@ -219,19 +232,23 @@ export default function Dashboard() {
 
 function StatCard({ title, value, icon: Icon, color, variants, to }: any) {
   return (
-    <Link to={to} className="block group decoration-none">
+    <Link to={to} className="block group decoration-none h-full">
       <motion.div 
         variants={variants}
-        className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-all group-hover:border-[#D4AF37]/30"
+        className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-all group-hover:border-[#D4AF37]/30 h-full"
       >
-        <div className={cn("p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-110", color)}>
+        <div className={cn("p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-105 shrink-0", color)}>
           <Icon size={24} />
         </div>
-        <div>
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
-          <div className="flex items-center gap-2">
-            <p className="text-3xl font-black text-[#002B5B]">{value}</p>
-            <ChevronRight className="text-slate-300 group-hover:text-[#D4AF37] transition-colors" size={20} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate mb-0.5" title={title}>
+            {title}
+          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-2xl font-black text-[#002B5B] tabular-nums leading-none">
+              {value}
+            </p>
+            <ChevronRight className="text-slate-300 group-hover:text-[#D4AF37] transition-colors shrink-0" size={16} />
           </div>
         </div>
       </motion.div>
