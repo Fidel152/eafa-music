@@ -266,7 +266,7 @@ export default function Chat() {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-80px)] md:h-[calc(100vh-140px)] flex flex-col md:flex-row bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden relative">
+    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-110px)] md:h-[calc(100vh-140px)] flex flex-col md:flex-row bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden relative">
       {/* Sidebar Members List */}
       <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col shrink-0 ${selectedMember ? 'hidden md:flex' : 'flex h-full'}`}>
         <div className="p-4 md:p-6 border-b border-slate-100 bg-[#002B5B]">

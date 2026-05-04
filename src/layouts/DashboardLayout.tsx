@@ -253,90 +253,84 @@ export default function DashboardLayout() {
           </button>
         </header>
 
-        <AnimatePresence>
-          {isSidebarOpen && (
-            <div className="fixed inset-0 z-[100] md:hidden">
-              <motion.div
-                key="mobile-sidebar-overlay"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSidebarOpen(false)}
-                className="absolute inset-0 bg-[#002B5B]/80 backdrop-blur-md"
-              />
-              <motion.aside
-                key="mobile-sidebar-content"
-                initial={{ x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="relative w-80 max-w-[85%] bg-[#002B5B] text-white shadow-2xl flex flex-col h-full border-r border-white/10"
-              >
-                <div className="p-6 flex items-center justify-between border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-white/10 rounded-xl p-2 overflow-hidden border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
-                      <img 
-                        src="https://img.icons8.com/ios-filled/512/D4AF37/music.png" 
-                        alt="Logo" 
-                        className="w-full h-full object-contain"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <span className="text-xl font-bold tracking-tight">EAFA Music</span>
+        {/* Mobile Sidebar */}
+        {isSidebarOpen && (
+          <div className="fixed inset-0 z-[1000] md:hidden">
+            {/* Overlay */}
+            <div 
+              className="absolute inset-0 bg-[#002B5B]/90 backdrop-blur-sm" 
+              onClick={() => setSidebarOpen(false)} 
+            />
+            
+            {/* Sidebar Content */}
+            <aside className="relative w-80 max-w-[85%] bg-[#002B5B] text-white shadow-2xl flex flex-col h-full border-r border-white/10 animate-in slide-in-from-left duration-300">
+              <div className="p-6 flex items-center justify-between border-b border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/10 rounded-xl p-2 overflow-hidden border border-[#D4AF37]/30">
+                    <Music2 className="w-full h-full text-[#D4AF37]" />
                   </div>
-                  <button 
+                  <span className="text-xl font-bold tracking-tight">EAFA Music</span>
+                </div>
+                <button 
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X size={32} />
+                </button>
+              </div>
+
+              <nav className="px-4 py-8 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                {menuItems.map((item) => (
+                  <Link 
+                    key={item.path} 
+                    to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-4 rounded-xl transition-all",
+                      location.pathname === item.path 
+                        ? "bg-[#D4AF37] text-[#002B5B] font-black" 
+                        : "text-slate-300 hover:bg-white/5"
+                    )}
                   >
-                    <X size={32} />
+                    <item.icon size={24} />
+                    <span className="text-base font-semibold">{item.name}</span>
+                  </Link>
+                ))}
+                
+                <div className="pt-6 mt-6 border-t border-white/5 space-y-3">
+                  <Link 
+                    to="/profile" 
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-4 py-4 rounded-xl transition-all",
+                      location.pathname === '/profile' 
+                        ? "bg-[#D4AF37] text-[#002B5B] font-black" 
+                        : "text-slate-300 bg-white/5"
+                    )}
+                  >
+                    <UserIcon size={24} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-black truncate uppercase tracking-tight leading-tight">
+                        {user?.displayName || 'Mon Profil'}
+                      </p>
+                      <p className="text-[11px] uppercase opacity-70 font-bold">
+                        {user?.role === 'admin' ? 'Coordinateur' : 'Membre Choriste'}
+                      </p>
+                    </div>
+                  </Link>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-5 text-slate-400 hover:text-red-400 rounded-xl transition-all text-sm font-black uppercase tracking-widest"
+                  >
+                    <LogOut size={24} />
+                    <span>Se Déconnecter</span>
                   </button>
                 </div>
-                <nav className="px-4 py-8 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-                  {menuItems.map((item) => (
-                    <NavItem 
-                      key={item.path} 
-                      item={item} 
-                      isActive={location.pathname === item.path} 
-                      onClick={() => setSidebarOpen(false)}
-                      variants={navItemVariants}
-                    />
-                  ))}
-                  
-                  <div className="pt-6 mt-6 border-t border-white/5 space-y-3">
-                    <Link 
-                      to="/profile" 
-                      onClick={() => setSidebarOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 w-full px-4 py-4 rounded-xl transition-all",
-                        location.pathname === '/profile' 
-                          ? "bg-[#D4AF37] text-[#002B5B] font-black shadow-lg" 
-                          : "text-slate-300 bg-white/5 hover:bg-white/10"
-                      )}
-                    >
-                      <UserIcon size={24} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-base font-black truncate uppercase tracking-tight leading-tight">
-                          {user?.displayName || 'Mon Profil'}
-                        </p>
-                        <p className="text-[11px] uppercase opacity-70 font-bold tracking-wider">
-                          {user?.role === 'admin' ? 'Coordinateur' : 'Membre Choriste'}
-                        </p>
-                      </div>
-                    </Link>
-
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-3 w-full px-4 py-5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all text-sm font-black uppercase tracking-widest"
-                    >
-                      <LogOut size={24} />
-                      <span>Se Déconnecter</span>
-                    </button>
-                  </div>
-                </nav>
-              </motion.aside>
-            </div>
-          )}
-        </AnimatePresence>
+              </nav>
+            </aside>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
