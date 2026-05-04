@@ -31,6 +31,7 @@ export default function Members() {
   
   const [formData, setFormData] = useState({
     fullName: '',
+    accessName: '',
     role: 'member' as const
   });
 
@@ -76,8 +77,8 @@ export default function Members() {
     if (!isAdmin) return;
 
     try {
-      if (members.some(m => m.fullName.toLowerCase() === formData.fullName.toLowerCase())) {
-        toast.error('Ce membre existe déjà');
+      if (members.some(m => m.accessName?.toLowerCase() === formData.accessName.toLowerCase())) {
+        toast.error('Cette clé d’accès est déjà utilisée');
         return;
       }
 
@@ -111,7 +112,7 @@ export default function Members() {
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setFormData({ fullName: '', role: 'member' });
+    setFormData({ fullName: '', accessName: '', role: 'member' });
   };
 
   const filteredMembers = members.filter(m => 
@@ -183,6 +184,11 @@ export default function Members() {
                 <div>
                   <h3 className="font-black text-[#002B5B] text-lg leading-tight">{m.fullName}</h3>
                   <div className="flex items-center gap-2 mt-1">
+                    {isAdmin && (
+                      <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-tighter" title="Clé d'accès">
+                        Clé: {m.accessName || 'N/A'}
+                      </span>
+                    )}
                     {m.role === 'admin' ? (
                       <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
                         <Crown size={10} /> Admin
@@ -267,7 +273,21 @@ export default function Members() {
               </div>
               <form onSubmit={handleSubmit} className="p-8 space-y-6">
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nom Complet (Exact)</label>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Clé d'accès (Identifiant de connexion)</label>
+                  <input 
+                    type="text" required
+                    value={formData.accessName}
+                    onChange={(e) => setFormData({ ...formData, accessName: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#D4AF37]/20 outline-none font-bold text-[#002B5B]"
+                    placeholder="Ex: CHORISTE-01"
+                  />
+                  <p className="mt-1 text-[9px] text-slate-400">
+                    Cette clé servira au membre pour se connecter à son espace.
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nom Complet (Affichage)</label>
                   <input 
                     type="text" required
                     value={formData.fullName}
@@ -275,9 +295,6 @@ export default function Members() {
                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#D4AF37]/20 outline-none"
                     placeholder="Prénom Nom"
                   />
-                  <p className="mt-2 text-[10px] text-slate-400 italic">
-                    * Le membre devra saisir ce nom exactement pour se connecter.
-                  </p>
                 </div>
                 <div>
                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Rôle</label>

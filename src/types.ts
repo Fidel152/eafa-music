@@ -3,6 +3,8 @@ export type UserRole = 'admin' | 'member';
 export interface Member {
   id: string;
   fullName: string;
+  accessName?: string;
+  email?: string;
   role: UserRole;
   joinedAt: any;
   active: boolean;
@@ -77,8 +79,11 @@ export interface Message {
   senderId: string;
   receiverId: string;
   content: string;
+  type: 'text' | 'image' | 'video' | 'audio' | 'photo' | 'file';
+  fileUrl?: string;
   read: boolean;
   createdAt: any;
+  deleted?: boolean;
 }
 
 export interface AuthState {

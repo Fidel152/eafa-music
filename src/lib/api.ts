@@ -8,14 +8,25 @@ export const api = {
   auth: {
     loginByName: async (name: string) => {
       const trimmedName = name.trim();
-      const { data, error } = await supabase
+      // Try finding by access_name first, then full_name as fallback
+      let { data, error } = await supabase
         .from('members')
         .select('*')
-        .ilike('full_name', trimmedName)
+        .eq('access_name', trimmedName)
         .single();
       
       if (error || !data) {
-        throw new Error("Accès refusé : vous n'êtes pas membre de la chorale ou votre nom est incorrect.");
+        // Fallback for existing users who might only have full_name set as key
+        const { data: fallback, error: fallbackError } = await supabase
+          .from('members')
+          .select('*')
+          .ilike('full_name', trimmedName)
+          .single();
+        
+        if (fallbackError || !fallback) {
+          throw new Error("Accès refusé : clé d'accès incorrecte.");
+        }
+        data = fallback;
       }
 
       return { 
@@ -42,6 +53,7 @@ export const api = {
       return (data || []).map(m => ({
         id: m.id,
         fullName: m.full_name,
+        accessName: m.access_name,
         role: m.role,
         voiceType: m.voice_type,
         instrument: m.instrument,
@@ -56,6 +68,7 @@ export const api = {
       const dbMember = {
         id: member.id || Date.now().toString(),
         full_name: member.fullName,
+        access_name: member.accessName,
         role: member.role,
         voice_type: member.voiceType,
         instrument: member.instrument,
@@ -85,6 +98,7 @@ export const api = {
     update: async (id: string, member: Partial<Member>) => {
       const dbMember: any = {};
       if (member.fullName !== undefined) dbMember.full_name = member.fullName;
+      if (member.accessName !== undefined) dbMember.access_name = member.accessName;
       if (member.role !== undefined) dbMember.role = member.role;
       if (member.voiceType !== undefined) dbMember.voice_type = member.voiceType;
       if (member.instrument !== undefined) dbMember.instrument = member.instrument;
@@ -439,7 +453,6 @@ export const api = {
   },
   messages: {
     listConversations: async (userId: string): Promise<Message[]> => {
-      // This is a simplified list of latest messages for conversation list
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -451,8 +464,11 @@ export const api = {
         senderId: m.sender_id,
         receiverId: m.receiver_id,
         content: m.content,
+        type: m.type || 'text',
+        fileUrl: m.file_url,
         read: m.read,
-        createdAt: m.created_at
+        createdAt: m.created_at,
+        deleted: m.deleted
       }));
     },
     listThread: async (userId: string, otherId: string): Promise<Message[]> => {
@@ -467,22 +483,35 @@ export const api = {
         senderId: m.sender_id,
         receiverId: m.receiver_id,
         content: m.content,
+        type: m.type || 'text',
+        fileUrl: m.file_url,
         read: m.read,
-        createdAt: m.created_at
+        createdAt: m.created_at,
+        deleted: m.deleted
       }));
     },
-    send: async (message: Partial<Message>) => {
+    send: async (message: Partial<Message> & { type?: string, fileUrl?: string }) => {
       const { data, error } = await supabase
         .from('messages')
         .insert([{
           sender_id: message.senderId,
           receiver_id: message.receiverId,
-          content: message.content
+          content: message.content,
+          type: message.type || 'text',
+          file_url: message.fileUrl
         }])
         .select()
         .single();
       if (error) throw error;
       return data;
+    },
+    delete: async (messageId: string) => {
+      const { error } = await supabase
+        .from('messages')
+        .update({ deleted: true, content: 'Message supprimé' })
+        .eq('id', messageId);
+      if (error) throw error;
+      return true;
     },
     markAsRead: async (userId: string, senderId: string) => {
       const { error } = await supabase

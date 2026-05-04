@@ -26,10 +26,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (user && user.uid && !user.id) {
           user.id = user.uid;
         }
+        
         setState({
           user: user,
           loading: false,
         });
+
+        // Background sync to ensure ID is still valid/correct in members table
+        if (user.displayName) {
+          api.auth.loginByName(user.displayName)
+            .then(res => {
+              if (res.success && res.user.id !== user.id) {
+                console.log("Syncing user ID:", user.id, "->", res.user.id);
+                updateUser({ id: res.user.id, role: res.user.role });
+              }
+            })
+            .catch(err => console.warn("Failed to background sync user:", err));
+        }
       } catch (e) {
         localStorage.removeItem('app_user');
         renderDefault();

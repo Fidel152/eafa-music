@@ -70,14 +70,15 @@ export default function Rehearsals() {
 
   const handleUpdateAttendance = async (rehearsalId: string, status: Attendance['status']) => {
     if (!user) return;
+    const toastId = toast.loading('Mise à jour...');
     try {
       await api.attendance.update(rehearsalId, user.id, status);
-      toast.success('Présence mise à jour');
+      toast.success('Présence mise à jour', { id: toastId });
       loadData(); // Reload to show update
     } catch (error: any) {
-      console.error("Attendance update error:", error);
+      console.error("Attendance update error details:", error);
       const message = error.message || 'Erreur lors de la mise à jour';
-      toast.error(message);
+      toast.error("Échec: " + message, { id: toastId });
     }
   };
 

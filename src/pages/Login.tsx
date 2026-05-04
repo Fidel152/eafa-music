@@ -72,14 +72,14 @@ export default function Login() {
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Votre Nom</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Clé d'Accès Personnel</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Jean Dupont"
+                  placeholder="Ex: CHORISTE-01"
                   className="w-full bg-white/10 border border-white/20 rounded-xl py-4 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all font-medium"
                 />
               </div>
@@ -93,18 +93,18 @@ export default function Login() {
               {loading ? (
                 <div className="w-6 h-6 border-2 border-[#002B5B]/30 border-t-[#002B5B] rounded-full animate-spin" />
               ) : (
-                "Se connecter"
+                "Entrer mon espace"
               )}
             </button>
             
             <div className="flex items-center gap-4 py-2">
               <div className="h-px bg-white/10 flex-1" />
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Connexion Directe</span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Aide</span>
               <div className="h-px bg-white/10 flex-1" />
             </div>
             
             <p className="text-center text-[10px] text-slate-400 font-medium leading-relaxed uppercase">
-              Entrez simplement votre nom pour accéder à votre espace membre.
+              Veuillez saisir la clé fournie par le coordinateur pour vous identifier.
             </p>
           </form>
         </div>

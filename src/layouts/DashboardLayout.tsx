@@ -39,9 +39,31 @@ const NavItem = ({ item, isActive, onClick, variants }: any) => {
           console.error(e);
         }
       };
+      
       checkMessages();
-      const interval = setInterval(checkMessages, 10000);
-      return () => clearInterval(interval);
+
+      // Real-time subscription for unread count
+      const channel = supabase
+        .channel('nav-messages')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages' }, // Listen to all changes (insert & update/read)
+          (payload) => {
+            const newest = payload.new as any;
+            const oldest = payload.old as any;
+            // Check if it concerns current user
+            if (newest && newest.receiver_id === user.id) {
+              checkMessages();
+            } else if (oldest && oldest.receiver_id === user.id) {
+              checkMessages();
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [item.badge, user]);
 
