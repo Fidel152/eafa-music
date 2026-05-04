@@ -28,6 +28,7 @@ export default function Profile() {
 
   const loadProfile = async () => {
     if (!user) return;
+    setLoading(true);
     try {
       const members = await api.members.list();
       const myData = members.find(m => m.id === user.id);
@@ -43,6 +44,9 @@ export default function Profile() {
       }
     } catch (e) {
       console.error(e);
+      toast.error("Erreur de chargement du profil");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,7 +77,28 @@ export default function Profile() {
     }
   };
 
-  if (!memberData) return null;
+  if (loading && !memberData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-12 h-12 border-4 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin" />
+        <p className="text-[#002B5B] font-bold animate-pulse">Chargement de votre profil...</p>
+      </div>
+    );
+  }
+
+  if (!memberData && !loading) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-slate-400">Impossible de charger les données du profil.</p>
+        <button 
+          onClick={loadProfile}
+          className="mt-4 text-[#D4AF37] font-bold hover:underline"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">

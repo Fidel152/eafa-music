@@ -23,6 +23,55 @@ import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
+const NavItem = ({ item, isActive, onClick, variants }: any) => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const Icon = item.icon;
+
+  useEffect(() => {
+    if (item.badge && user) {
+      const checkMessages = async () => {
+        try {
+          const messages = await api.messages.listConversations(user.id);
+          const unread = messages.filter((m: any) => m.receiverId === user.id && !m.read).length;
+          setUnreadCount(unread);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      checkMessages();
+      const interval = setInterval(checkMessages, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [item.badge, user]);
+
+  const content = (
+    <motion.div
+      variants={variants}
+      whileHover="hover"
+      whileTap="tap"
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative",
+        isActive 
+          ? "bg-[#D4AF37] text-[#002B5B] font-semibold shadow-lg" 
+          : "text-slate-300 hover:bg-white/10 hover:text-white"
+      )}
+    >
+      <Icon size={20} />
+      <span>{item.name}</span>
+      {item.badge && unreadCount > 0 && (
+        <span className="absolute right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#002B5B] animate-pulse" />
+      )}
+    </motion.div>
+  );
+
+  return (
+    <Link to={item.path} onClick={onClick}>
+      {content}
+    </Link>
+  );
+};
+
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
   const { permission, requestPermission, sendNotification } = useNotifications();
@@ -107,50 +156,14 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            const [unreadCount, setUnreadCount] = useState(0);
-
-            useEffect(() => {
-              if (item.badge && user) {
-                const checkMessages = async () => {
-                  try {
-                    const messages = await api.messages.listConversations(user.id);
-                    const unread = messages.filter(m => m.receiverId === user.id && !m.read).length;
-                    setUnreadCount(unread);
-                  } catch (e) {
-                    console.error(e);
-                  }
-                };
-                checkMessages();
-                const interval = setInterval(checkMessages, 10000);
-                return () => clearInterval(interval);
-              }
-            }, [item.badge, user]);
-
-            return (
-              <Link key={item.path} to={item.path}>
-                <motion.div
-                  variants={navItemVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative",
-                    isActive 
-                      ? "bg-[#D4AF37] text-[#002B5B] font-semibold shadow-lg" 
-                      : "text-slate-300 hover:bg-white/10 hover:text-white"
-                  )}
-                >
-                  <Icon size={20} />
-                  <span>{item.name}</span>
-                  {item.badge && unreadCount > 0 && (
-                    <span className="absolute right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#002B5B] animate-pulse" />
-                  )}
-                </motion.div>
-              </Link>
-            );
-          })}
+          {menuItems.map((item) => (
+            <NavItem 
+              key={item.path} 
+              item={item} 
+              isActive={location.pathname === item.path} 
+              variants={navItemVariants}
+            />
+          ))}
         </nav>
 
         <div className="p-4 border-t border-white/10 space-y-1 bg-[#001f41]">
@@ -248,46 +261,40 @@ export default function DashboardLayout() {
                   </button>
                 </div>
                 <nav className="px-4 py-6 space-y-2">
-                  {menuItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.path;
-                    const [unreadCount, setUnreadCount] = useState(0);
+                  {menuItems.map((item) => (
+                    <NavItem 
+                      key={item.path} 
+                      item={item} 
+                      isActive={location.pathname === item.path} 
+                      onClick={() => setSidebarOpen(false)}
+                      variants={navItemVariants}
+                    />
+                  ))}
 
-                    useEffect(() => {
-                      if (item.badge && user) {
-                        const checkMessages = async () => {
-                          try {
-                            const messages = await api.messages.listConversations(user.id);
-                            const unread = messages.filter(m => m.receiverId === user.id && !m.read).length;
-                            setUnreadCount(unread);
-                          } catch (e) {
-                            console.error(e);
-                          }
-                        };
-                        checkMessages();
-                      }
-                    }, [item.badge, user]);
+                  <Link 
+                    to="/profile" 
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-4 py-4 rounded-xl mt-6 transition-all",
+                      location.pathname === '/profile' 
+                        ? "bg-[#D4AF37] text-[#002B5B] font-black" 
+                        : "text-slate-300 bg-white/5"
+                    )}
+                  >
+                    <UserIcon size={20} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black truncate uppercase tracking-tight">
+                        {user?.displayName || 'Mon Profil'}
+                      </p>
+                      <p className="text-[10px] uppercase opacity-70 font-bold">
+                        {user?.role === 'admin' ? 'Coordinateur' : 'Membre'}
+                      </p>
+                    </div>
+                  </Link>
 
-                    return (
-                      <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}>
-                        <div className={cn(
-                          "flex items-center gap-3 px-4 py-3 rounded-xl relative",
-                          isActive 
-                            ? "bg-[#D4AF37] text-[#002B5B] font-semibold" 
-                            : "text-slate-300 hover:bg-white/10"
-                        )}>
-                          <Icon size={20} />
-                          <span>{item.name}</span>
-                          {item.badge && unreadCount > 0 && (
-                            <span className="absolute right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#002B5B]" />
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-slate-300 mt-8 border-t border-white/10"
+                    className="flex items-center gap-3 w-full px-4 py-4 text-slate-400 mt-4 border-t border-white/10 text-xs font-black uppercase tracking-widest"
                   >
                     <LogOut size={20} />
                     <span>Déconnexion</span>
