@@ -1,25 +1,177 @@
 /**
- * Frontend API client using local Express backend
+ * Frontend API client using Supabase
  */
+import { supabase } from './supabase';
 import { Member, Song, Announcement, Instrument, Rehearsal, Attendance, Comment, Message } from '../types';
 
-const handleResponse = async (res: Response) => {
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: 'Une erreur est survenue' }));
-    throw new Error(error.error || 'Erreur réseau');
-  }
-  return res.json();
+// Helper to map snake_case from Supabase to camelCase for the app
+const mapMember = (m: any): Member => {
+  if (!m) return null as any;
+  
+  // Harmonize roles (french/english, case-insensitive)
+  let role = String(m.role || 'member').toLowerCase();
+  if (role === 'membre' || role === 'choriste') role = 'member';
+  if (role === 'admin' || role === 'administrateur' || role === 'coordinateur') role = 'admin';
+  if (role !== 'admin') role = 'member';
+
+  return {
+    id: m.id,
+    fullName: m.full_name || '',
+    accessName: m.id || '', // Use 'id' as accessName since access_name column doesn't exist
+    email: m.email || '',
+    role: role as 'admin' | 'member',
+    joinedAt: m.created_at || m.joined_at || new Date().toISOString(),
+    active: m.active !== false,
+    voiceType: m.voice_type,
+    instrument: m.instrument,
+    avatarUrl: m.avatar_url,
+    phoneNumber: m.phone_number,
+    lastSeen: m.last_seen
+  };
 };
+
+const mapToMemberDB = (m: Partial<Member>) => {
+  const db: any = {};
+  // If accessName is provided and no id, use accessName as id
+  if (m.accessName !== undefined && !m.id) db.id = m.accessName;
+  if (m.id !== undefined) db.id = m.id;
+  
+  if (m.fullName !== undefined) db.full_name = m.fullName;
+  if (m.email !== undefined) db.email = m.email;
+  if (m.role !== undefined) db.role = m.role;
+  if (m.active !== undefined) db.active = m.active;
+  if (m.voiceType !== undefined) db.voice_type = m.voiceType;
+  if (m.instrument !== undefined) db.instrument = m.instrument;
+  if (m.avatarUrl !== undefined) db.avatar_url = m.avatarUrl;
+  if (m.phoneNumber !== undefined) db.phone_number = m.phoneNumber;
+  if (m.lastSeen !== undefined) db.last_seen = m.lastSeen;
+  return db;
+};
+
+const mapSong = (s: any): Song => ({
+  ...s,
+  audioUrl: s.audio_url,
+  addedAt: s.added_at
+});
+
+const mapToSongDB = (s: Partial<Song>) => {
+  const db: any = { ...s };
+  if (s.audioUrl !== undefined) { db.audio_url = s.audioUrl; delete db.audioUrl; }
+  if (s.addedAt !== undefined) { db.added_at = s.addedAt; delete db.addedAt; }
+  return db;
+};
+
+const mapAnnouncement = (a: any): Announcement => ({
+  ...a,
+  imageUrl: a.image_url,
+  createdAt: a.created_at
+});
+
+const mapToAnnouncementDB = (a: Partial<Announcement>) => {
+  const db: any = { ...a };
+  if (a.imageUrl !== undefined) { db.image_url = a.imageUrl; delete db.imageUrl; }
+  if (a.createdAt !== undefined) { db.created_at = a.createdAt; delete db.createdAt; }
+  return db;
+};
+
+const mapInstrument = (i: any): Instrument => ({
+  ...i,
+  imageUrl: i.image_url,
+  lastMaintenance: i.last_maintenance
+});
+
+const mapToInstrumentDB = (i: Partial<Instrument>) => {
+  const db: any = { ...i };
+  if (i.imageUrl !== undefined) { db.image_url = i.imageUrl; delete db.imageUrl; }
+  if (i.lastMaintenance !== undefined) { 
+    db.last_maintenance = i.lastMaintenance instanceof Date ? i.lastMaintenance.toISOString() : i.lastMaintenance; 
+    delete db.lastMaintenance; 
+  }
+  return db;
+};
+
+const mapRehearsal = (r: any): Rehearsal => ({
+  ...r,
+  createdAt: r.created_at
+});
+
+const mapToRehearsalDB = (r: Partial<Rehearsal>) => {
+  const db: any = { ...r };
+  if (r.createdAt !== undefined) { db.created_at = r.createdAt; delete db.createdAt; }
+  return db;
+};
+
+const mapAttendance = (a: any): Attendance => ({
+  ...a,
+  rehearsalId: a.rehearsal_id,
+  memberId: a.member_id,
+  updatedAt: a.updated_at
+});
+
+const mapComment = (c: any): Comment => ({
+  ...c,
+  targetId: c.target_id,
+  targetType: c.target_type,
+  memberId: c.member_id,
+  memberName: c.member_name,
+  createdAt: c.created_at,
+  parentId: c.parent_id
+});
+
+const mapMessage = (m: any): Message => ({
+  ...m,
+  senderId: m.sender_id,
+  receiverId: m.receiver_id,
+  fileUrl: m.file_url,
+  createdAt: m.created_at,
+  read: m.read || false,
+  deleted: m.deleted || false
+});
 
 export const api = {
   auth: {
     loginByName: async (name: string) => {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      return handleResponse(res);
+      // Login logic: find member by id (access key) or fullName
+      
+      // Try ID match first (exact)
+      let { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .eq('id', name)
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        // Try Name match (case-insensitive)
+        const { data: nameData, error: nameError } = await supabase
+          .from('members')
+          .select('*')
+          .ilike('full_name', name)
+          .limit(1)
+          .maybeSingle();
+        
+        data = nameData;
+        error = nameError;
+      }
+
+      if (error) {
+        console.error("Supabase login error:", error);
+        throw new Error("Erreur technique lors de la connexion.");
+      }
+
+      if (!data) {
+        throw new Error("Membre non trouvé. Vérifiez votre code d'accès ou votre nom.");
+      }
+      
+      const member = mapMember(data);
+      return {
+        success: true,
+        user: {
+          id: member.id,
+          displayName: member.fullName,
+          role: member.role
+        }
+      };
     },
     logout: async () => {
       return { success: true };
@@ -27,195 +179,339 @@ export const api = {
   },
   members: {
     list: async (): Promise<Member[]> => {
-      const res = await fetch('/api/members');
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('full_name');
+      if (error) throw error;
+      return (data || []).map(mapMember);
     },
     create: async (member: Partial<Member>) => {
-      const res = await fetch('/api/members', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(member)
-      });
-      return handleResponse(res);
+      const dbData = mapToMemberDB(member);
+      // Ensure we have an ID for Supabase if not provided
+      if (!dbData.id) {
+        dbData.id = crypto.randomUUID();
+      }
+      const { data, error } = await supabase
+        .from('members')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapMember(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('members')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     },
     update: async (id: string, member: Partial<Member>) => {
-      const res = await fetch(`/api/members/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(member)
-      });
-      return handleResponse(res);
+      const dbData = mapToMemberDB(member);
+      const { data, error } = await supabase
+        .from('members')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapMember(data);
     },
     updatePresence: async (id: string) => {
-      const res = await fetch(`/api/members/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lastSeen: new Date().toISOString() })
-      });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('members')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     }
   },
   songs: {
     list: async (): Promise<Song[]> => {
-      const res = await fetch('/api/songs');
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .order('title');
+      if (error) throw error;
+      return (data || []).map(mapSong);
     },
     create: async (song: Partial<Song>) => {
-      const res = await fetch('/api/songs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(song)
-      });
-      return handleResponse(res);
+      const dbData = mapToSongDB(song);
+      if (!dbData.id) {
+        dbData.id = crypto.randomUUID();
+      }
+      const { data, error } = await supabase
+        .from('songs')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapSong(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/songs/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     },
     update: async (id: string, song: Partial<Song>) => {
-      const res = await fetch(`/api/songs/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(song)
-      });
-      return handleResponse(res);
+      const dbData = mapToSongDB(song);
+      const { data, error } = await supabase
+        .from('songs')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapSong(data);
     }
   },
   announcements: {
     list: async (): Promise<Announcement[]> => {
-      const res = await fetch('/api/announcements');
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(mapAnnouncement);
     },
     create: async (ann: Partial<Announcement>) => {
-      const res = await fetch('/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ann)
-      });
-      return handleResponse(res);
+      const dbData = mapToAnnouncementDB(ann);
+      if (!dbData.id) {
+        dbData.id = crypto.randomUUID();
+      }
+      const { data, error } = await supabase
+        .from('announcements')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapAnnouncement(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/announcements/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     },
     update: async (id: string, ann: Partial<Announcement>) => {
-      const res = await fetch(`/api/announcements/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ann)
-      });
-      return handleResponse(res);
+      const dbData = mapToAnnouncementDB(ann);
+      const { data, error } = await supabase
+        .from('announcements')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapAnnouncement(data);
     }
   },
   instruments: {
     list: async (): Promise<Instrument[]> => {
-      const res = await fetch('/api/instruments');
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return (data || []).map(mapInstrument);
     },
     create: async (inst: Partial<Instrument>) => {
-      const res = await fetch('/api/instruments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inst)
-      });
-      return handleResponse(res);
+      const dbData = mapToInstrumentDB(inst);
+      if (!dbData.id) {
+        dbData.id = crypto.randomUUID();
+      }
+      const { data, error } = await supabase
+        .from('instruments')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapInstrument(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/instruments/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('instruments')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     },
     update: async (id: string, inst: Partial<Instrument>) => {
-      const res = await fetch(`/api/instruments/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inst)
-      });
-      return handleResponse(res);
+      const dbData = mapToInstrumentDB(inst);
+      const { data, error } = await supabase
+        .from('instruments')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapInstrument(data);
     }
   },
   rehearsals: {
     list: async (): Promise<Rehearsal[]> => {
-      const res = await fetch('/api/rehearsals');
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('rehearsals')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(mapRehearsal);
     },
     create: async (rehearsal: Partial<Rehearsal>) => {
-      const res = await fetch('/api/rehearsals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rehearsal)
-      });
-      return handleResponse(res);
+      const dbData = mapToRehearsalDB(rehearsal);
+      if (!dbData.id) {
+        dbData.id = crypto.randomUUID();
+      }
+      const { data, error } = await supabase
+        .from('rehearsals')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapRehearsal(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/rehearsals/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('rehearsals')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     }
   },
   attendance: {
     listForRehearsal: async (rehearsalId: string): Promise<Attendance[]> => {
-      const res = await fetch(`/api/attendance/${rehearsalId}`);
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('rehearsal_id', rehearsalId);
+      if (error) throw error;
+      return (data || []).map(mapAttendance);
     },
     update: async (rehearsalId: string, memberId: string, status: string) => {
-      const res = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rehearsalId, memberId, status })
-      });
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('attendance')
+        .upsert({ 
+          id: `${rehearsalId}_${memberId}`, // Ensure ID is present
+          rehearsal_id: rehearsalId, 
+          member_id: memberId, 
+          status,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'rehearsal_id,member_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return mapAttendance(data);
     }
   },
   comments: {
     list: async (targetId: string): Promise<Comment[]> => {
-      const res = await fetch(`/api/comments/${targetId}`);
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('target_id', targetId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(mapComment);
     },
     create: async (comment: Partial<Comment>) => {
-      const res = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(comment)
-      });
-      return handleResponse(res);
+      const dbData: any = {
+        id: crypto.randomUUID(),
+        target_id: comment.targetId,
+        target_type: comment.targetType,
+        member_id: comment.memberId,
+        member_name: comment.memberName,
+        content: comment.content,
+        parent_id: comment.parentId
+      };
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([dbData])
+        .select()
+        .single();
+      if (error) throw error;
+      return mapComment(data);
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/comments/${id}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
     }
   },
   messages: {
     listConversations: async (userId: string): Promise<Message[]> => {
-      const res = await fetch(`/api/messages/${userId}`);
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(mapMessage);
     },
     listThread: async (userId: string, otherId: string): Promise<Message[]> => {
-      const res = await fetch(`/api/messages/thread/${userId}/${otherId}`);
-      return handleResponse(res);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(mapMessage);
     },
     send: async (message: Partial<Message> & { type?: string, fileUrl?: string }) => {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(message)
-      });
-      return handleResponse(res);
+      const dbData: any = {
+        sender_id: message.senderId,
+        receiver_id: message.receiverId,
+        content: message.content || '',
+        type: message.type || 'text',
+        file_url: message.fileUrl || null,
+        read: false,
+        deleted: false,
+        created_at: new Date().toISOString()
+      };
+      
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([dbData])
+        .select();
+
+      if (error) {
+        console.error("Supabase insert error details:", error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        throw new Error("No data returned after insert");
+      }
+
+      return mapMessage(data[0]);
     },
     delete: async (messageId: string) => {
-      const res = await fetch(`/api/messages/${messageId}`, { method: 'DELETE' });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+      if (error) throw error;
+      return { success: true };
     },
     markAsRead: async (userId: string, senderId: string) => {
-      const res = await fetch('/api/messages/mark-read', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, senderId })
-      });
-      return handleResponse(res);
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('receiver_id', userId)
+        .eq('sender_id', senderId);
+      if (error) throw error;
+      return { success: true };
     }
   }
 };
+
 

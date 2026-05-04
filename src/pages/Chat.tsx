@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { Member, Message } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Search, Send, User, Clock, Phone, Mail, Image as ImageIcon, CheckCircle2, ChevronLeft, Trash2, Info, Paperclip, Mic, Video, Camera, MoreVertical, X, Play, Volume2 } from 'lucide-react';
@@ -87,10 +88,28 @@ export default function Chat() {
     loadMembers();
     loadConversations();
     
-    // Polling for conversations as fallback
-    const interval = setInterval(loadConversations, 10000);
-    return () => clearInterval(interval);
-  }, [user]); 
+    // Real-time subscription for messages
+    const channel = supabase
+      .channel('public:messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const newest = payload.new as any;
+          if (user && (newest.sender_id === user.id || newest.receiver_id === user.id)) {
+            loadConversations();
+            if (selectedMember && (newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id)) {
+              loadMessages();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedMember]); 
 
   const loadConversations = async () => {
     if (!user) return;
@@ -165,7 +184,7 @@ export default function Chat() {
       toast.success("Envoyé", { id: toastId });
     } catch (error: any) {
       console.error("Send message error details:", error);
-      let errorMsg = "Erreur d'envoi";
+      let errorMsg = error?.message || "Erreur d'envoi";
       if (error?.message?.includes('payload too large')) {
         errorMsg = "Fichier trop volumineux (Max ~1MB)";
       } else if (error?.message?.includes('column "type" does not exist')) {
