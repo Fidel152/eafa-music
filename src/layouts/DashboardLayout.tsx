@@ -253,16 +253,16 @@ export default function DashboardLayout() {
           </button>
         </header>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {isSidebarOpen && (
-            <div className="fixed inset-0 z-50 md:hidden flex overflow-hidden">
+            <div className="fixed inset-0 z-[100] md:hidden">
               <motion.div
                 key="mobile-sidebar-overlay"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSidebarOpen(false)}
-                className="absolute inset-0 bg-[#002B5B]/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-[#002B5B]/80 backdrop-blur-md"
               />
               <motion.aside
                 key="mobile-sidebar-content"
@@ -270,9 +270,9 @@ export default function DashboardLayout() {
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="relative w-80 max-w-[85%] bg-[#002B5B] text-white shadow-2xl flex flex-col h-full"
+                className="relative w-80 max-w-[85%] bg-[#002B5B] text-white shadow-2xl flex flex-col h-full border-r border-white/10"
               >
-                <div className="p-6 flex items-center justify-between border-b border-white/10">
+                <div className="p-6 flex items-center justify-between border-b border-white/5">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-white/10 rounded-xl p-2 overflow-hidden border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
                       <img 
@@ -288,7 +288,7 @@ export default function DashboardLayout() {
                     onClick={() => setSidebarOpen(false)}
                     className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                   >
-                    <X size={28} />
+                    <X size={32} />
                   </button>
                 </div>
                 <nav className="px-4 py-8 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
@@ -302,7 +302,7 @@ export default function DashboardLayout() {
                     />
                   ))}
                   
-                  <div className="pt-6 mt-6 border-t border-white/10 space-y-3">
+                  <div className="pt-6 mt-6 border-t border-white/5 space-y-3">
                     <Link 
                       to="/profile" 
                       onClick={() => setSidebarOpen(false)}
