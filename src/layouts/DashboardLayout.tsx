@@ -244,29 +244,35 @@ export default function DashboardLayout() {
             </div>
             <span className="font-bold">EAFA Music</span>
           </div>
-          <button onClick={() => setSidebarOpen(true)}>
-            <Menu size={24} />
+          <button 
+            onClick={() => setSidebarOpen(true)}
+            className="p-3 -mr-2 bg-white/10 rounded-xl hover:bg-white/20 active:scale-90 transition-all border border-white/10"
+            title="Menu"
+          >
+            <Menu size={28} />
           </button>
         </header>
 
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {isSidebarOpen && (
-            <>
+            <div className="fixed inset-0 z-50 md:hidden flex overflow-hidden">
               <motion.div
+                key="mobile-sidebar-overlay"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSidebarOpen(false)}
-                className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                className="absolute inset-0 bg-[#002B5B]/60 backdrop-blur-sm"
               />
               <motion.aside
+                key="mobile-sidebar-content"
                 initial={{ x: '-100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed inset-y-0 left-0 w-72 bg-[#002B5B] text-white z-50 md:hidden shadow-2xl flex flex-col"
+                className="relative w-80 max-w-[85%] bg-[#002B5B] text-white shadow-2xl flex flex-col h-full"
               >
-                <div className="p-6 flex items-center justify-between">
+                <div className="p-6 flex items-center justify-between border-b border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-white/10 rounded-xl p-2 overflow-hidden border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
                       <img 
@@ -276,13 +282,16 @@ export default function DashboardLayout() {
                         referrerPolicy="no-referrer"
                       />
                     </div>
-                    <span className="text-xl font-bold">EAFA Music</span>
+                    <span className="text-xl font-bold tracking-tight">EAFA Music</span>
                   </div>
-                  <button onClick={() => setSidebarOpen(false)}>
-                    <X size={24} />
+                  <button 
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <X size={28} />
                   </button>
                 </div>
-                <nav className="px-4 py-6 space-y-2 overflow-y-auto flex-1">
+                <nav className="px-4 py-8 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
                   {menuItems.map((item) => (
                     <NavItem 
                       key={item.path} 
@@ -292,38 +301,40 @@ export default function DashboardLayout() {
                       variants={navItemVariants}
                     />
                   ))}
+                  
+                  <div className="pt-6 mt-6 border-t border-white/10 space-y-3">
+                    <Link 
+                      to="/profile" 
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 w-full px-4 py-4 rounded-xl transition-all",
+                        location.pathname === '/profile' 
+                          ? "bg-[#D4AF37] text-[#002B5B] font-black shadow-lg" 
+                          : "text-slate-300 bg-white/5 hover:bg-white/10"
+                      )}
+                    >
+                      <UserIcon size={24} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base font-black truncate uppercase tracking-tight leading-tight">
+                          {user?.displayName || 'Mon Profil'}
+                        </p>
+                        <p className="text-[11px] uppercase opacity-70 font-bold tracking-wider">
+                          {user?.role === 'admin' ? 'Coordinateur' : 'Membre Choriste'}
+                        </p>
+                      </div>
+                    </Link>
 
-                  <Link 
-                    to="/profile" 
-                    onClick={() => setSidebarOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 w-full px-4 py-4 rounded-xl mt-6 transition-all",
-                      location.pathname === '/profile' 
-                        ? "bg-[#D4AF37] text-[#002B5B] font-black" 
-                        : "text-slate-300 bg-white/5"
-                    )}
-                  >
-                    <UserIcon size={20} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black truncate uppercase tracking-tight">
-                        {user?.displayName || 'Mon Profil'}
-                      </p>
-                      <p className="text-[10px] uppercase opacity-70 font-bold">
-                        {user?.role === 'admin' ? 'Coordinateur' : 'Membre'}
-                      </p>
-                    </div>
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-4 text-slate-400 mt-4 border-t border-white/10 text-xs font-black uppercase tracking-widest mb-10"
-                  >
-                    <LogOut size={20} />
-                    <span>Déconnexion</span>
-                  </button>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full px-4 py-5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all text-sm font-black uppercase tracking-widest"
+                    >
+                      <LogOut size={24} />
+                      <span>Se Déconnecter</span>
+                    </button>
+                  </div>
                 </nav>
               </motion.aside>
-            </>
+            </div>
           )}
         </AnimatePresence>
 

@@ -266,9 +266,9 @@ export default function Chat() {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-100px)] md:h-[calc(100vh-140px)] flex bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-80px)] md:h-[calc(100vh-140px)] flex flex-col md:flex-row bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden relative">
       {/* Sidebar Members List */}
-      <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col shrink-0 ${selectedMember ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col shrink-0 ${selectedMember ? 'hidden md:flex' : 'flex h-full'}`}>
         <div className="p-4 md:p-6 border-b border-slate-100 bg-[#002B5B]">
           <h2 className="text-lg md:text-xl font-black text-white mb-4">Messagerie</h2>
           <div className="relative">
@@ -408,7 +408,7 @@ export default function Chat() {
                         {!isMe && !showAvatar && <div className="w-8 shrink-0" />}
                         <div 
                           onClick={() => setSelectedMessage(msg)}
-                          className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-2.5 md:p-3.5 shadow-sm relative cursor-pointer active:scale-[0.98] transition-transform ${
+                          className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 md:p-4 shadow-sm relative cursor-pointer active:scale-[0.98] transition-transform ${
                           isMe 
                             ? 'bg-[#002B5B] text-white rounded-br-none' 
                             : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
@@ -416,7 +416,7 @@ export default function Chat() {
                           
                           {!msg.deleted ? (
                             <>
-                              {msg.type === 'text' && <p className="text-sm leading-relaxed">{msg.content}</p>}
+                              {msg.type === 'text' && <p className="text-sm md:text-base leading-relaxed font-medium">{msg.content}</p>}
                               
                               {(msg.type === 'image' || msg.type === 'photo') && (
                                 <div className="rounded-xl overflow-hidden mb-1">
@@ -550,13 +550,14 @@ export default function Chat() {
 
                     <button 
                       type="submit"
-                      className={`p-3 md:p-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center ${
+                      className={`p-3 md:p-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center min-w-[50px] md:min-w-[64px] ${
                         newMessage.trim() 
-                          ? 'bg-[#002B5B] text-[#D4AF37] scale-105' 
-                          : 'bg-slate-200 text-slate-400'
-                      }`}
+                          ? 'bg-[#002B5B] text-[#D4AF37] scale-105 shadow-[#D4AF37]/30 ring-2 ring-[#002B5B]' 
+                          : 'bg-slate-100 text-slate-400'
+                      } border border-slate-200`}
+                      title="Envoyer"
                     >
-                      <Send size={24} strokeWidth={2.5} />
+                      <Send size={24} strokeWidth={3} className={newMessage.trim() ? 'animate-pulse' : ''} />
                     </button>
                   </>
                 )}
