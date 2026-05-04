@@ -31,7 +31,12 @@ export default function Profile() {
     setLoading(true);
     try {
       const members = await api.members.list();
-      const myData = members.find(m => m.id === user.id);
+      // Try finding by ID first, then fallback to email for more resilience
+      let myData = members.find(m => m.id === user.id);
+      if (!myData && user.email) {
+        myData = members.find(m => m.email?.toLowerCase() === user.email?.toLowerCase());
+      }
+
       if (myData) {
         setMemberData(myData);
         setFormData({
@@ -41,6 +46,8 @@ export default function Profile() {
           voiceType: myData.voiceType || '',
           instrument: myData.instrument || ''
         });
+      } else {
+        console.warn("Member data not found for user:", user.id, user.email);
       }
     } catch (e) {
       console.error(e);

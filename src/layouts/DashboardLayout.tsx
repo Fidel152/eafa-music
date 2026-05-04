@@ -260,7 +260,7 @@ export default function DashboardLayout() {
                     <X size={24} />
                   </button>
                 </div>
-                <nav className="px-4 py-6 space-y-2">
+                <nav className="px-4 py-6 space-y-2 overflow-y-auto flex-1">
                   {menuItems.map((item) => (
                     <NavItem 
                       key={item.path} 
@@ -294,7 +294,7 @@ export default function DashboardLayout() {
 
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-4 text-slate-400 mt-4 border-t border-white/10 text-xs font-black uppercase tracking-widest"
+                    className="flex items-center gap-3 w-full px-4 py-4 text-slate-400 mt-4 border-t border-white/10 text-xs font-black uppercase tracking-widest mb-10"
                   >
                     <LogOut size={20} />
                     <span>Déconnexion</span>
