@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
 import { Member, Message } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Search, Send, User, Clock, Phone, Mail, Image as ImageIcon, CheckCircle2, ChevronLeft, Trash2, Info, Paperclip, Mic, Video, Camera, MoreVertical, X, Play, Volume2 } from 'lucide-react';
@@ -88,28 +87,10 @@ export default function Chat() {
     loadMembers();
     loadConversations();
     
-    // Real-time subscription for messages
-    const channel = supabase
-      .channel('public:messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const newest = payload.new as any;
-          if (user && (newest.sender_id === user.id || newest.receiver_id === user.id)) {
-            loadConversations();
-            if (selectedMember && (newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id)) {
-              loadMessages();
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, selectedMember]); // Re-subscribe if selection changes or user changes
+    // Polling for conversations as fallback
+    const interval = setInterval(loadConversations, 10000);
+    return () => clearInterval(interval);
+  }, [user]); 
 
   const loadConversations = async () => {
     if (!user) return;
@@ -508,56 +489,56 @@ export default function Chat() {
                 )}
               </AnimatePresence>
 
-              <form onSubmit={(e) => handleSendMessage(e)} className="flex gap-2 md:gap-4 items-center w-full">
+              <form onSubmit={(e) => handleSendMessage(e)} className="flex gap-1.5 md:gap-4 items-center w-full">
                 <button 
                   type="button"
                   onClick={() => setShowMediaOptions(!showMediaOptions)}
-                  className={`shrink-0 p-3 md:p-4 rounded-2xl transition-all ${showMediaOptions ? 'bg-[#D4AF37] text-[#002B5B]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  className={`shrink-0 p-2.5 md:p-4 rounded-xl md:rounded-2xl transition-all ${showMediaOptions ? 'bg-[#D4AF37] text-[#002B5B]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
-                  <Paperclip size={24} />
+                  <Paperclip size={20} className="md:w-6 md:h-6" />
                 </button>
 
                 {isRecording ? (
-                  <div className="flex-1 flex items-center gap-4 bg-red-50 p-2 md:p-3 rounded-2xl border border-red-100 min-w-0">
-                    <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)] shrink-0" />
-                    <span className="text-red-600 font-bold text-sm tabular-nums flex-1 truncate">{formatTime(recordingTime)}</span>
+                  <div className="flex-1 flex items-center gap-2 md:gap-4 bg-red-50 p-2 md:p-3 rounded-xl md:rounded-2xl border border-red-100 min-w-0">
+                    <div className="w-3 h-3 md:w-4 md:h-4 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)] shrink-0" />
+                    <span className="text-red-600 font-bold text-xs md:text-sm tabular-nums flex-1 truncate">{formatTime(recordingTime)}</span>
                     <button 
                       type="button"
                       onClick={stopRecording}
-                      className="shrink-0 p-3 bg-red-500 text-white rounded-xl shadow-lg hover:bg-red-600 transition-all font-black uppercase text-[10px] tracking-widest px-4 md:px-6"
+                      className="shrink-0 p-2 md:p-3 bg-red-500 text-white rounded-lg md:rounded-xl shadow-lg hover:bg-red-600 transition-all font-black uppercase text-[8px] md:text-[10px] tracking-widest px-3 md:px-6"
                     >
-                      Terminer
+                      OK
                     </button>
                   </div>
                 ) : (
                   <>
                     <input 
                       type="text"
-                      placeholder="Écrire un message..."
+                      placeholder="Message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-2xl px-3 md:px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-sm md:text-base outline-none font-medium text-[#002B5B]"
+                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-sm md:text-base outline-none font-medium text-[#002B5B]"
                     />
                     
                     <button 
                       type="button"
                       onClick={startRecording}
-                      className="shrink-0 p-3 md:p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 hover:text-red-500 transition-all shadow-sm flex items-center justify-center"
+                      className="shrink-0 p-2.5 md:p-4 bg-slate-100 text-slate-500 rounded-xl md:rounded-2xl hover:bg-slate-200 hover:text-red-500 transition-all shadow-sm flex items-center justify-center"
                       title="Micro"
                     >
-                      <Mic size={24} />
+                      <Mic size={20} className="md:w-6 md:h-6" />
                     </button>
 
                     <button 
                       type="submit"
-                      className={`shrink-0 p-3 md:p-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center min-w-[50px] md:min-w-[64px] ${
+                      className={`shrink-0 p-2.5 md:p-4 rounded-xl md:rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center ${
                         newMessage.trim() 
                           ? 'bg-[#002B5B] text-[#D4AF37] scale-105 shadow-[#D4AF37]/30 ring-2 ring-[#002B5B]' 
                           : 'bg-slate-100 text-slate-400'
-                      } border border-slate-200`}
+                      } border border-slate-200 min-w-[44px] md:min-w-[64px]`}
                       title="Envoyer"
                     >
-                      <Send size={24} strokeWidth={3} className={newMessage.trim() ? 'animate-pulse' : ''} />
+                      <Send size={20} strokeWidth={3} className={`md:w-6 md:h-6 ${newMessage.trim() ? 'animate-pulse' : ''}`} />
                     </button>
                   </>
                 )}

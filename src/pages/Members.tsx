@@ -28,6 +28,7 @@ export default function Members() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -74,23 +75,33 @@ export default function Members() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) return;
+    if (!isAdmin || submitting) return;
 
+    setSubmitting(true);
     try {
-      if (members.some(m => m.accessName?.toLowerCase() === formData.accessName.toLowerCase())) {
-        toast.error('Cette clé d’accès est déjà utilisée');
+      if (members.length > 0 && members.some(m => m.accessName && m.accessName.toLowerCase() === formData.accessName.toLowerCase())) {
+        toast.error('Cette clé d’accès est déjà utilisée par un autre membre');
+        setSubmitting(false);
         return;
       }
 
-      await api.members.create({
+      const response = await api.members.create({
         ...formData,
         active: true
       });
-      toast.success('Membre ajouté à la base');
+      console.log("Create response:", response);
+      toast.success('Membre ajouté avec succès !');
       loadMembers();
       closeModal();
     } catch (error: any) {
-      toast.error(`Erreur lors de l’ajout`);
+      console.error("Create member error:", error);
+      let message = "Erreur technique lors de l’ajout";
+      if (error.message) message = error.message;
+      toast.error(message, { 
+        description: "Vérifiez que le serveur est bien démarré ou contactez l'assistance." 
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -322,8 +333,16 @@ export default function Members() {
                    </div>
                 </div>
                 <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={closeModal} className="flex-1 py-4 font-bold bg-slate-100 rounded-xl">Annuler</button>
-                  <button type="submit" className="flex-2 py-4 font-black bg-[#002B5B] text-white rounded-xl shadow-lg">Ajouter</button>
+                  <button type="button" onClick={closeModal} className="flex-1 py-4 font-bold bg-slate-100 rounded-xl" disabled={submitting}>Annuler</button>
+                  <button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="flex-2 py-4 font-black bg-[#002B5B] text-white rounded-xl shadow-lg flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : 'Ajouter'}
+                  </button>
                 </div>
               </form>
             </motion.div>

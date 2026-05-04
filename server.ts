@@ -20,13 +20,25 @@ async function startServer() {
     CREATE TABLE IF NOT EXISTS members (
       id TEXT PRIMARY KEY,
       fullName TEXT NOT NULL,
+      accessName TEXT,
       role TEXT DEFAULT 'member',
       voiceType TEXT,
       instrument TEXT,
       active INTEGER DEFAULT 1,
-      joinedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      joinedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      avatarUrl TEXT,
+      phoneNumber TEXT,
+      lastSeen DATETIME
     );
+  `);
 
+  // Migrations for existing tables
+  try { db.exec("ALTER TABLE members ADD COLUMN avatarUrl TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE members ADD COLUMN phoneNumber TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE members ADD COLUMN lastSeen DATETIME"); } catch(e) {}
+  try { db.exec("ALTER TABLE members ADD COLUMN accessName TEXT"); } catch(e) {}
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS songs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -57,6 +69,46 @@ async function startServer() {
       imageUrl TEXT,
       lastMaintenance DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS rehearsals (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      date DATETIME NOT NULL,
+      location TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS attendance (
+      id TEXT PRIMARY KEY,
+      rehearsalId TEXT NOT NULL,
+      memberId TEXT NOT NULL,
+      status TEXT NOT NULL,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      targetId TEXT NOT NULL,
+      targetType TEXT NOT NULL,
+      memberId TEXT NOT NULL,
+      memberName TEXT NOT NULL,
+      content TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      parentId TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      senderId TEXT NOT NULL,
+      receiverId TEXT NOT NULL,
+      content TEXT NOT NULL,
+      type TEXT DEFAULT 'text',
+      fileUrl TEXT,
+      read INTEGER DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      deleted INTEGER DEFAULT 0
+    );
   `);
 
   // Bootstrap Admin "Christian Delfi" if not exists
@@ -67,20 +119,30 @@ async function startServer() {
     console.log(`Admin ${adminName} created!`);
   }
 
-  app.use(express.json());
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", membersCount: db.prepare("SELECT count(*) as count FROM members").get() });
+  });
 
   // API Routes
   
   // Auth (Restrictive login)
   app.post("/api/auth/login", (req, res) => {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ error: "Nom requis" });
+    const { name: rawName } = req.body;
+    if (!rawName) return res.status(400).json({ error: "Nom requis" });
 
-    // ONLY allow existing members to login
-    const user = db.prepare("SELECT * FROM members WHERE fullName = ?").get(name) as any;
+    const name = rawName.trim();
+
+    // Try finding by accessName first, then fullName (case-insensitive search)
+    let user = db.prepare("SELECT * FROM members WHERE LOWER(accessName) = LOWER(?)").get(name) as any;
+    if (!user) {
+      user = db.prepare("SELECT * FROM members WHERE LOWER(fullName) = LOWER(?)").get(name) as any;
+    }
     
     if (!user) {
-      return res.status(401).json({ error: "Accès refusé : vous n'êtes pas membre de la chorale ou votre nom est incorrect." });
+      return res.status(401).json({ error: "Accès refusé : vous n'êtes pas membre de la chorale ou votre clé d'accès est incorrecte." });
     }
 
     res.json({ success: true, user: { id: user.id, displayName: user.fullName, role: user.role } });
@@ -88,16 +150,23 @@ async function startServer() {
 
   // Members
   app.get("/api/members", (req, res) => {
-    const members = db.prepare("SELECT * FROM members ORDER BY fullName ASC").all();
-    res.json(members);
+    const members = db.prepare("SELECT * FROM members ORDER BY fullName ASC").all() as any[];
+    res.json(members.map(m => ({ ...m, active: m.active === 1 })));
   });
 
   app.post("/api/members", (req, res) => {
-    const { fullName, role, voiceType, instrument } = req.body;
-    const id = Date.now().toString();
-    db.prepare("INSERT INTO members (id, fullName, role, voiceType, instrument) VALUES (?, ?, ?, ?, ?)")
-      .run(id, fullName, role, voiceType, instrument);
-    res.json({ id, fullName, role, voiceType, instrument });
+    console.log("POST /api/members body:", req.body);
+    try {
+      const { fullName, accessName, role, voiceType, instrument, avatarUrl, phoneNumber } = req.body;
+      const id = Date.now().toString();
+      db.prepare("INSERT INTO members (id, fullName, accessName, role, voiceType, instrument, avatarUrl, phoneNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(id, fullName, accessName || null, role || 'member', voiceType || null, instrument || null, avatarUrl || null, phoneNumber || null);
+      console.log("Member created successfully:", id);
+      res.json({ id, fullName, accessName, role, voiceType, instrument, avatarUrl, phoneNumber, active: true });
+    } catch (error: any) {
+      console.error("Error creating member:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.delete("/api/members/:id", (req, res) => {
@@ -106,10 +175,132 @@ async function startServer() {
   });
 
   app.put("/api/members/:id", (req, res) => {
-    const { fullName, role, voiceType, instrument, active } = req.body;
-    db.prepare("UPDATE members SET fullName = ?, role = ?, voiceType = ?, instrument = ?, active = ? WHERE id = ?")
-      .run(fullName, role, voiceType, instrument, active ? 1 : 0, req.params.id);
-    res.json({ id: req.params.id, fullName, role, voiceType, instrument, active });
+    console.log(`PUT /api/members/${req.params.id} body:`, req.body);
+    try {
+      const existing = db.prepare("SELECT * FROM members WHERE id = ?").get(req.params.id) as any;
+      if (!existing) {
+        return res.status(404).json({ error: "Membre non trouvé" });
+      }
+
+      const { 
+        fullName = existing.fullName, 
+        accessName = existing.accessName, 
+        role = existing.role, 
+        voiceType = existing.voiceType, 
+        instrument = existing.instrument, 
+        active = existing.active === 1, 
+        avatarUrl = existing.avatarUrl, 
+        phoneNumber = existing.phoneNumber, 
+        lastSeen = existing.lastSeen 
+      } = req.body;
+
+      db.prepare("UPDATE members SET fullName = ?, accessName = ?, role = ?, voiceType = ?, instrument = ?, active = ?, avatarUrl = ?, phoneNumber = ?, lastSeen = ? WHERE id = ?")
+        .run(fullName, accessName, role, voiceType, instrument, active ? 1 : 0, avatarUrl, phoneNumber, lastSeen, req.params.id);
+      
+      console.log("Member updated successfully:", req.params.id);
+      res.json({ id: req.params.id, fullName, accessName, role, voiceType, instrument, active });
+    } catch (error: any) {
+      console.error("Error updating member:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Rehearsals
+  app.get("/api/rehearsals", (req, res) => {
+    const data = db.prepare("SELECT * FROM rehearsals ORDER BY date ASC").all();
+    res.json(data);
+  });
+
+  app.post("/api/rehearsals", (req, res) => {
+    const { title, description, date, location } = req.body;
+    const id = Date.now().toString();
+    db.prepare("INSERT INTO rehearsals (id, title, description, date, location) VALUES (?, ?, ?, ?, ?)")
+      .run(id, title, description, date, location);
+    res.json({ id, title, date });
+  });
+
+  app.delete("/api/rehearsals/:id", (req, res) => {
+    db.prepare("DELETE FROM rehearsals WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Attendance
+  app.get("/api/attendance/:rehearsalId", (req, res) => {
+    const data = db.prepare("SELECT * FROM attendance WHERE rehearsalId = ?").all();
+    res.json(data);
+  });
+
+  app.post("/api/attendance", (req, res) => {
+    const { rehearsalId, memberId, status } = req.body;
+    const id = Date.now().toString();
+    const existing = db.prepare("SELECT id FROM attendance WHERE rehearsalId = ? AND memberId = ?").get(rehearsalId, memberId) as any;
+    
+    if (existing) {
+      db.prepare("UPDATE attendance SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?").run(status, existing.id);
+      res.json({ id: existing.id, status });
+    } else {
+      db.prepare("INSERT INTO attendance (id, rehearsalId, memberId, status) VALUES (?, ?, ?, ?)")
+        .run(id, rehearsalId, memberId, status);
+      res.json({ id, status });
+    }
+  });
+
+  // Comments
+  app.get("/api/comments/:targetId", (req, res) => {
+    const data = db.prepare("SELECT * FROM comments WHERE targetId = ? ORDER BY createdAt ASC").all();
+    res.json(data);
+  });
+
+  app.post("/api/comments", (req, res) => {
+    const { targetId, targetType, memberId, memberName, content, parentId } = req.body;
+    const id = Date.now().toString();
+    db.prepare("INSERT INTO comments (id, targetId, targetType, memberId, memberName, content, parentId) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(id, targetId, targetType, memberId, memberName, content, parentId);
+    res.json({ id, content });
+  });
+
+  app.delete("/api/comments/:id", (req, res) => {
+    db.prepare("DELETE FROM comments WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Messages
+  app.get("/api/messages/:userId", (req, res) => {
+    const data = db.prepare("SELECT * FROM messages WHERE senderId = ? OR receiverId = ? ORDER BY createdAt DESC").all(req.params.userId, req.params.userId) as any[];
+    res.json(data.map(m => ({ ...m, read: m.read === 1, deleted: m.deleted === 1 })));
+  });
+
+  app.get("/api/messages/thread/:userId/:otherId", (req, res) => {
+    const data = db.prepare(`
+      SELECT * FROM messages 
+      WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) 
+      ORDER BY createdAt ASC
+    `).all(req.params.userId, req.params.otherId, req.params.otherId, req.params.userId) as any[];
+    res.json(data.map(m => ({ ...m, read: m.read === 1, deleted: m.deleted === 1 })));
+  });
+
+  app.post("/api/messages", (req, res) => {
+    const { senderId, receiverId, content, type, fileUrl } = req.body;
+    const id = Date.now().toString();
+    db.prepare("INSERT INTO messages (id, senderId, receiverId, content, type, fileUrl) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, senderId, receiverId, content, type || 'text', fileUrl);
+    res.json({ id, content });
+  });
+
+  app.put("/api/messages/:id/read", (req, res) => {
+    db.prepare("UPDATE messages SET read = 1 WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.put("/api/messages/mark-read", (req, res) => {
+    const { userId, senderId } = req.body;
+    db.prepare("UPDATE messages SET read = 1 WHERE receiverId = ? AND senderId = ?").run(userId, senderId);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/messages/:id", (req, res) => {
+    db.prepare("UPDATE messages SET deleted = 1, content = 'Message supprimé' WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
   });
 
   // Songs

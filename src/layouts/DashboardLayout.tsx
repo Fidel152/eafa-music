@@ -21,7 +21,6 @@ import { useNotifications } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
 
 const NavItem = ({ item, isActive, onClick, variants }: any) => {
   const { user } = useAuth();
@@ -41,29 +40,8 @@ const NavItem = ({ item, isActive, onClick, variants }: any) => {
       };
       
       checkMessages();
-
-      // Real-time subscription for unread count
-      const channel = supabase
-        .channel('nav-messages')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'messages' }, // Listen to all changes (insert & update/read)
-          (payload) => {
-            const newest = payload.new as any;
-            const oldest = payload.old as any;
-            // Check if it concerns current user
-            if (newest && newest.receiver_id === user.id) {
-              checkMessages();
-            } else if (oldest && oldest.receiver_id === user.id) {
-              checkMessages();
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      const interval = setInterval(checkMessages, 30000); // Polling as fallback for real-time
+      return () => clearInterval(interval);
     }
   }, [item.badge, user]);
 
@@ -104,41 +82,31 @@ export default function DashboardLayout() {
 
   const isAdmin = user?.role === 'admin';
 
-  // Real-time announcements subscription
+  // Non-real-time announcements sync (polling)
   useEffect(() => {
     if (!user) return;
 
-    // Initial check for latest ID
-    api.announcements.list()
-      .then(list => {
-        if (list && list.length > 0) {
-          lastAnnouncementId.current = list[0].id;
-        }
-      })
-      .catch(err => console.error("Could not fetch initial announcements:", err));
-
-    const channel = supabase
-      .channel('public:announcements')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'announcements' },
-        (payload) => {
-          const newest = payload.new as any;
-          if (newest.id !== lastAnnouncementId.current) {
-            sendNotification(`Nouvelle annonce : ${newest.title}`, {
-              body: newest.content,
-              tag: 'new-announcement',
-              requireInteraction: true
-            });
-            lastAnnouncementId.current = newest.id;
+    const checkAnnouncements = () => {
+      api.announcements.list()
+        .then(list => {
+          if (list && list.length > 0) {
+            if (lastAnnouncementId.current && list[0].id !== lastAnnouncementId.current) {
+              const newest = list[0];
+              sendNotification(`Nouvelle annonce : ${newest.title}`, {
+                body: newest.content,
+                tag: 'new-announcement',
+                requireInteraction: true
+              });
+            }
+            lastAnnouncementId.current = list[0].id;
           }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+        })
+        .catch(err => console.error("Could not fetch announcements:", err));
     };
+
+    checkAnnouncements();
+    const interval = setInterval(checkAnnouncements, 60000);
+    return () => clearInterval(interval);
   }, [sendNotification, user]);
 
   const menuItems = [

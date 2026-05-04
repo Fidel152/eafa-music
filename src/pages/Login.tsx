@@ -93,7 +93,7 @@ export default function Login() {
               {loading ? (
                 <div className="w-6 h-6 border-2 border-[#002B5B]/30 border-t-[#002B5B] rounded-full animate-spin" />
               ) : (
-                "Entrer mon espace"
+                "Se connecter"
               )}
             </button>
             

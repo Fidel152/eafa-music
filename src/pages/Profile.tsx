@@ -77,8 +77,9 @@ export default function Profile() {
       toast.success('Profil mis à jour');
       setIsEditing(false);
       loadProfile();
-    } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+    } catch (error: any) {
+      console.error("Update profile error:", error);
+      toast.error(error.message || 'Erreur lors de la mise à jour');
     } finally {
       setLoading(false);
     }
