@@ -475,7 +475,7 @@ export default function Chat() {
             </div>
 
             {/* New Message Input */}
-            <div className="p-4 md:p-6 bg-white border-t border-slate-100 relative">
+            <div className="p-3 md:p-6 bg-white border-t border-slate-100 relative">
               <AnimatePresence>
                 {showMediaOptions && (
                   <motion.div 
@@ -508,23 +508,23 @@ export default function Chat() {
                 )}
               </AnimatePresence>
 
-              <form onSubmit={(e) => handleSendMessage(e)} className="flex gap-2 md:gap-4 items-center">
+              <form onSubmit={(e) => handleSendMessage(e)} className="flex gap-2 md:gap-4 items-center w-full">
                 <button 
                   type="button"
                   onClick={() => setShowMediaOptions(!showMediaOptions)}
-                  className={`p-3 md:p-4 rounded-2xl transition-all ${showMediaOptions ? 'bg-[#D4AF37] text-[#002B5B]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  className={`shrink-0 p-3 md:p-4 rounded-2xl transition-all ${showMediaOptions ? 'bg-[#D4AF37] text-[#002B5B]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
                   <Paperclip size={24} />
                 </button>
 
                 {isRecording ? (
-                  <div className="flex-1 flex items-center gap-4 bg-red-50 p-2 md:p-3 rounded-2xl border border-red-100">
-                    <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                    <span className="text-red-600 font-bold text-sm tabular-nums flex-1">{formatTime(recordingTime)}</span>
+                  <div className="flex-1 flex items-center gap-4 bg-red-50 p-2 md:p-3 rounded-2xl border border-red-100 min-w-0">
+                    <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)] shrink-0" />
+                    <span className="text-red-600 font-bold text-sm tabular-nums flex-1 truncate">{formatTime(recordingTime)}</span>
                     <button 
                       type="button"
                       onClick={stopRecording}
-                      className="p-3 bg-red-500 text-white rounded-xl shadow-lg hover:bg-red-600 transition-all font-black uppercase text-[10px] tracking-widest px-6"
+                      className="shrink-0 p-3 bg-red-500 text-white rounded-xl shadow-lg hover:bg-red-600 transition-all font-black uppercase text-[10px] tracking-widest px-4 md:px-6"
                     >
                       Terminer
                     </button>
@@ -536,13 +536,13 @@ export default function Chat() {
                       placeholder="Écrire un message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-sm md:text-base outline-none font-medium text-[#002B5B]"
+                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-2xl px-3 md:px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-sm md:text-base outline-none font-medium text-[#002B5B]"
                     />
                     
                     <button 
                       type="button"
                       onClick={startRecording}
-                      className="p-3 md:p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 hover:text-red-500 transition-all shadow-sm"
+                      className="shrink-0 p-3 md:p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 hover:text-red-500 transition-all shadow-sm flex items-center justify-center"
                       title="Micro"
                     >
                       <Mic size={24} />
@@ -550,7 +550,7 @@ export default function Chat() {
 
                     <button 
                       type="submit"
-                      className={`p-3 md:p-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center min-w-[50px] md:min-w-[64px] ${
+                      className={`shrink-0 p-3 md:p-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center min-w-[50px] md:min-w-[64px] ${
                         newMessage.trim() 
                           ? 'bg-[#002B5B] text-[#D4AF37] scale-105 shadow-[#D4AF37]/30 ring-2 ring-[#002B5B]' 
                           : 'bg-slate-100 text-slate-400'
