@@ -398,7 +398,6 @@ export const api = {
       const { data, error } = await supabase
         .from('attendance')
         .upsert({ 
-          id: `${rehearsalId}_${memberId}`, // Ensure ID is present
           rehearsal_id: rehearsalId, 
           member_id: memberId, 
           status,
