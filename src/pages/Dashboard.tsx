@@ -124,7 +124,7 @@ export default function Dashboard() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6"
       >
         <StatCard 
           title="Annonces" 
@@ -165,15 +165,15 @@ export default function Dashboard() {
           variants={itemVariants}
           initial="hidden"
           animate="show"
-          className="lg:col-span-2 bg-white rounded-3xl p-8 shadow-sm border border-slate-100"
+          className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm border border-slate-100"
         >
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-black text-[#002B5B] flex items-center gap-2">
-              <TrendingUp className="text-[#D4AF37]" />
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-black text-[#002B5B] flex items-center gap-2">
+              <TrendingUp className="text-[#D4AF37] w-5 h-5 sm:w-6 sm:h-6" />
               Dernière Annonce
             </h2>
-            <Link to="/announcements" className="text-sm font-bold text-[#D4AF37] hover:underline flex items-center gap-1">
-              Tout voir <ChevronRight size={16} />
+            <Link to="/announcements" className="text-xs sm:text-sm font-bold text-[#D4AF37] hover:underline flex items-center gap-1">
+              Tout voir <ChevronRight size={14} className="sm:w-4 sm:h-4" />
             </Link>
           </div>
 
@@ -183,19 +183,19 @@ export default function Dashboard() {
                 <img 
                   src={latestAnnouncement.imageUrl} 
                   alt={latestAnnouncement.title}
-                  className="w-full h-48 object-cover rounded-2xl mb-4"
+                  className="w-full h-40 sm:h-48 object-cover rounded-xl sm:rounded-2xl mb-2 sm:mb-4"
                   referrerPolicy="no-referrer"
                 />
               )}
-              <h3 className="text-2xl font-bold text-[#002B5B]">{latestAnnouncement.title}</h3>
-              <p className="text-slate-600 line-clamp-3 leading-relaxed">
+              <h3 className="text-xl sm:text-2xl font-bold text-[#002B5B] line-clamp-1">{latestAnnouncement.title}</h3>
+              <p className="text-sm sm:text-base text-slate-600 line-clamp-2 sm:line-clamp-3 leading-relaxed tracking-tight">
                 {latestAnnouncement.content}
               </p>
-              <div className="pt-4 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  Publié le {formatDate(latestAnnouncement.createdAt)}
+              <div className="pt-2 sm:pt-4 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {formatDate(latestAnnouncement.createdAt)}
                 </span>
-                <Link to="/announcements" className="px-6 py-2 bg-[#002B5B] text-white text-sm font-bold rounded-xl hover:bg-[#003d82] transition-colors">
+                <Link to="/announcements" className="px-4 py-2 sm:px-6 sm:py-2 bg-[#002B5B] text-white text-[10px] sm:text-sm font-bold rounded-lg sm:rounded-xl hover:bg-[#003d82] transition-colors">
                   Lire plus
                 </Link>
               </div>
@@ -211,15 +211,15 @@ export default function Dashboard() {
           variants={itemVariants}
           initial="hidden"
           animate="show"
-          className="bg-[#002B5B] text-white rounded-3xl p-8 shadow-xl relative overflow-hidden"
+          className="bg-[#002B5B] text-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden"
         >
           <div className="relative z-10">
-            <Award className="text-[#D4AF37] mb-4" size={40} />
-            <h2 className="text-2xl font-black mb-4 tracking-tighter">Verset Musical</h2>
-            <p className="italic text-slate-300 mb-8 leading-relaxed">
+            <Award className="text-[#D4AF37] mb-3 sm:mb-4 w-8 h-8 sm:w-10 sm:h-10" />
+            <h2 className="text-xl sm:text-2xl font-black mb-3 sm:mb-4 tracking-tighter">Verset Musical</h2>
+            <p className="italic text-sm sm:text-base text-slate-300 mb-6 sm:mb-8 leading-relaxed">
               "Que tout ce qui respire loue l'Éternel ! Louez l'Éternel !"
             </p>
-            <p className="text-sm font-bold text-[#D4AF37]">Psaume 150:6</p>
+            <p className="text-[12px] sm:text-sm font-bold text-[#D4AF37]">Psaume 150:6</p>
           </div>
           
           <div className="absolute top-[-20%] right-[-20%] w-[150px] h-[150px] bg-white/5 rounded-full blur-2xl" />
@@ -235,20 +235,20 @@ function StatCard({ title, value, icon: Icon, color, variants, to }: any) {
     <Link to={to} className="block group decoration-none h-full">
       <motion.div 
         variants={variants}
-        className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-all group-hover:border-[#D4AF37]/30 h-full"
+        className="bg-white p-3 sm:p-6 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center sm:items-center text-center sm:text-left gap-2 sm:gap-4 hover:shadow-md transition-all group-hover:border-[#D4AF37]/30 h-full"
       >
-        <div className={cn("p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-105 shrink-0", color)}>
-          <Icon size={24} />
+        <div className={cn("p-2.5 sm:p-4 rounded-xl sm:rounded-2xl text-white shadow-lg transition-transform group-hover:scale-105 shrink-0", color)}>
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate mb-0.5" title={title}>
+        <div className="min-w-0 flex-1 w-full">
+          <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest truncate mb-0.5" title={title}>
             {title}
           </p>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-2xl font-black text-[#002B5B] tabular-nums leading-none">
+          <div className="flex items-center justify-center sm:justify-between gap-1 sm:gap-2">
+            <p className="text-lg sm:text-2xl font-black text-[#002B5B] tabular-nums leading-none">
               {value}
             </p>
-            <ChevronRight className="text-slate-300 group-hover:text-[#D4AF37] transition-colors shrink-0" size={16} />
+            <ChevronRight className="hidden sm:block text-slate-300 group-hover:text-[#D4AF37] transition-colors shrink-0" size={16} />
           </div>
         </div>
       </motion.div>

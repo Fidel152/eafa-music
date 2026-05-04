@@ -242,7 +242,7 @@ export default function DashboardLayout() {
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed inset-y-0 left-0 w-72 bg-[#002B5B] text-white z-50 md:hidden shadow-2xl"
+                className="fixed inset-y-0 left-0 w-72 bg-[#002B5B] text-white z-50 md:hidden shadow-2xl flex flex-col"
               >
                 <div className="p-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
