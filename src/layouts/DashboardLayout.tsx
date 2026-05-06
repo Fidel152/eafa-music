@@ -126,30 +126,7 @@ export default function DashboardLayout() {
         }
       })
       .catch(err => console.error(err));
-
-    const channel = supabase
-      .channel('public-announcements')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'announcements' },
-        (payload) => {
-          const newest = payload.new as any;
-          if (newest.id !== lastAnnouncementId.current) {
-            sendNotification(`Nouvelle annonce : ${newest.title}`, {
-              body: newest.content,
-              tag: 'new-announcement',
-              requireInteraction: true
-            });
-            lastAnnouncementId.current = newest.id;
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [sendNotification, user]);
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -201,7 +178,7 @@ export default function DashboardLayout() {
             )}
           >
             {permission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
-            <span>{permission === 'granted' ? 'Notifications Activez' : 'Activer Notifications'}</span>
+            <span>{permission === 'granted' ? 'Notifications Activées' : 'Activer Notifications'}</span>
           </button>
 
           <button
@@ -227,9 +204,16 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-6">
-            <button className="relative p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-all active:scale-95">
-              <Bell size={20} strokeWidth={2.5} />
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#D4AF37] rounded-full border-2 border-white" />
+            <button 
+              onClick={requestPermission}
+              className="relative p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-all active:scale-95 group"
+            >
+              {permission === 'granted' ? (
+                <Bell size={20} strokeWidth={2.5} className="text-emerald-500" />
+              ) : (
+                <BellOff size={20} strokeWidth={2.5} className="text-amber-500" />
+              )}
+              {permission === 'granted' && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />}
             </button>
 
             <Link to="/profile" className="flex items-center gap-3 pl-4 border-l border-slate-100 group">
@@ -262,9 +246,16 @@ export default function DashboardLayout() {
           </div>
           
           <div className="flex items-center gap-2">
-            <button className="p-2 relative bg-white/5 rounded-xl border border-white/10">
-              <Bell size={24} />
-              <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-[#D4AF37] rounded-full border-2 border-[#002B5B]" />
+            <button 
+              onClick={requestPermission}
+              className="p-2 relative bg-white/5 rounded-xl border border-white/10"
+            >
+              {permission === 'granted' ? (
+                <Bell size={24} className="text-emerald-400" />
+              ) : (
+                <BellOff size={24} className="text-amber-400" />
+              )}
+              {permission === 'granted' && <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#002B5B]" />}
             </button>
             <button 
               onClick={() => setSidebarOpen(true)}
@@ -328,8 +319,19 @@ export default function DashboardLayout() {
                   ))}
                 </nav>
 
-                <div className="p-8 border-t border-white/5">
-                  <div className="bg-white/5 p-5 rounded-[2rem] flex items-center gap-4 mb-6">
+                <div className="p-8 border-t border-white/5 space-y-4">
+                  <button
+                    onClick={requestPermission}
+                    className={cn(
+                      "flex items-center gap-4 w-full px-5 py-4 rounded-2xl transition-all text-xs font-black uppercase tracking-widest bg-white/5",
+                      permission === 'granted' ? "text-emerald-400" : "text-amber-400"
+                    )}
+                  >
+                    {permission === 'granted' ? <Bell size={24} /> : <BellOff size={24} />}
+                    <span>{permission === 'granted' ? 'Notifications Activées' : 'Activer Notifications'}</span>
+                  </button>
+
+                  <div className="bg-white/5 p-5 rounded-[2rem] flex items-center gap-4 mb-2">
                     <div className="h-12 w-12 bg-[#D4AF37] rounded-2xl flex items-center justify-center text-[#002B5B] font-black text-xl">
                       {user?.displayName?.[0] || 'U'}
                     </div>

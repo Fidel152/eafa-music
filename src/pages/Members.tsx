@@ -182,35 +182,42 @@ export default function Members() {
                 </div>
               )}
               
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-5">
                 <div className="relative">
-                  <div className="w-16 h-16 bg-[#002B5B] text-[#D4AF37] rounded-full flex items-center justify-center text-2xl font-black border-4 border-slate-50 shadow-sm overflow-hidden">
+                  <div className="w-20 h-20 bg-[#002B5B] text-[#D4AF37] rounded-[1.5rem] flex items-center justify-center text-3xl font-black border-4 border-slate-50 shadow-md overflow-hidden transform group-hover:rotate-3 transition-transform">
                     {m.avatarUrl ? (
-                      <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      <img src={m.avatarUrl} alt={m.fullName} className="w-full h-full object-cover" />
                     ) : (
-                      m.fullName.charAt(0)
+                      m.fullName.charAt(0).toUpperCase()
                     )}
                   </div>
+                  {isOnline(m.lastSeen) && (
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-white shadow-sm" />
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-black text-[#002B5B] text-lg leading-tight">{m.fullName}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    {isAdmin && (
-                      <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-tighter" title="Clé d'accès">
-                        Clé: {m.accessName || 'N/A'}
-                      </span>
-                    )}
-                    {m.role === 'admin' ? (
-                      <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
-                        <Crown size={10} /> Admin
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
-                        <User size={10} /> Membre
-                      </span>
-                    )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-black text-[#002B5B] text-xl leading-tight truncate" title={m.fullName}>
+                    {m.fullName}
+                  </h3>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex items-center gap-2">
+                      {(isAdmin || m.id === user?.id) && (
+                        <span className="text-[10px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded-lg uppercase tracking-wider border border-amber-100/50" title="Votre identifiant de connexion">
+                          ID: {m.accessName || m.id}
+                        </span>
+                      )}
+                      {m.role === 'admin' ? (
+                        <span className="px-2 py-1 bg-purple-50 text-purple-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 border border-purple-100/50">
+                          <Shield size={10} strokeWidth={3} /> Admin
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 border border-blue-100/50">
+                          <User size={10} strokeWidth={3} /> Membre
+                        </span>
+                      )}
+                    </div>
                     {m.voiceType && (
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">{m.voiceType}</span>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{m.voiceType}</p>
                     )}
                   </div>
                 </div>

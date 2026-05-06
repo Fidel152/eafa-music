@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../lib/api';
-import { Announcement, Message, Profile } from '../types';
+import { Announcement, Message, Member, Rehearsal } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -29,7 +29,7 @@ export default function Dashboard() {
     rehearsals: 0
   });
   const [latestAnnouncement, setLatestAnnouncement] = useState<Announcement | null>(null);
-  const [recentMembers, setRecentMembers] = useState<Profile[]>([]);
+  const [recentMembers, setRecentMembers] = useState<Member[]>([]);
   const [recentMessages, setRecentMessages] = useState<Message[]>([]);
   const [upcomingRehearsals, setUpcomingRehearsals] = useState<Rehearsal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,7 +105,8 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-10 md:space-y-14">
       {/* Welcome Header */}
-      <header className="flex flex-col items-center justify-center text-center space-y-6 pt-4">
+      <header className="flex flex-col items-center justify-center text-center space-y-6 pt-4 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-[#D4AF37]/5 rounded-full blur-3xl -z-10" />
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -286,9 +287,9 @@ export default function Dashboard() {
                     "h-12 w-12 rounded-2xl border-4 border-white flex items-center justify-center text-xs font-black shadow-sm",
                     i % 2 === 0 ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-600"
                   )}
-                  title={member.displayName}
+                  title={member.fullName}
                 >
-                  {member.displayName?.[0]}
+                  {member.fullName?.[0]}
                 </div>
               ))}
               <div className="h-12 w-12 rounded-2xl border-4 border-white bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-xs">

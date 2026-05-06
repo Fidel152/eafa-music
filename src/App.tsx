@@ -31,9 +31,11 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
 };
 
 import { usePresence } from './hooks/usePresence';
+import { useRealtimeNotifications } from './hooks/useRealtimeNotifications';
 
 function AppRoutes() {
   usePresence();
+  useRealtimeNotifications();
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

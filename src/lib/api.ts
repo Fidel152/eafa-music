@@ -17,7 +17,7 @@ const mapMember = (m: any): Member => {
   return {
     id: m.id,
     fullName: m.full_name || '',
-    accessName: m.id || '', // Use 'id' as accessName since access_name column doesn't exist
+    accessName: m.id || '', 
     email: m.email || '',
     role: role as 'admin' | 'member',
     joinedAt: m.created_at || m.joined_at || new Date().toISOString(),
@@ -32,9 +32,9 @@ const mapMember = (m: any): Member => {
 
 const mapToMemberDB = (m: Partial<Member>) => {
   const db: any = {};
-  // If accessName is provided and no id, use accessName as id
-  if (m.accessName !== undefined && !m.id) db.id = m.accessName;
+  // Prioritize ID if present, otherwise use accessName as the ID
   if (m.id !== undefined) db.id = m.id;
+  else if (m.accessName !== undefined) db.id = m.accessName;
   
   if (m.fullName !== undefined) db.full_name = m.fullName;
   if (m.email !== undefined) db.email = m.email;
@@ -128,41 +128,59 @@ const mapMessage = (m: any): Message => ({
   deleted: m.deleted || false
 });
 
+// Simple in-memory cache to improve responsiveness
+const _cache: Record<string, { data: any, timestamp: number }> = {};
+const CACHE_TTL = 60000; // 60 seconds
+
+const getCached = (key: string) => {
+  const entry = _cache[key];
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data;
+  }
+  return null;
+};
+
+const setCache = (key: string, data: any) => {
+  _cache[key] = { data, timestamp: Date.now() };
+};
+
+const clearCache = (key: string) => {
+  delete _cache[key];
+};
+
 export const api = {
   auth: {
-    loginByName: async (name: string) => {
-      // Login logic: find member by id (access key) or fullName
+    loginByName: async (identifier: string) => {
+      // Logic: 
+      // 1. Members login via their ID (Access Key)
+      // 2. ONLY Admins can also login using their Full Name
       
-      // Try ID match first (exact)
-      let { data, error } = await supabase
+      const search = identifier.trim();
+      let data = null;
+
+      // 1. Try direct ID match (Exact)
+      const { data: idMatch } = await supabase
         .from('members')
         .select('*')
-        .eq('id', name)
-        .limit(1)
+        .eq('id', search)
         .maybeSingle();
+      data = idMatch;
 
-      if (error || !data) {
-        // Try Name match (case-insensitive)
-        const { data: nameData, error: nameError } = await supabase
+      // 2. Try Name match ONLY if they are an ADMIN
+      if (!data) {
+        const { data: nameMatch } = await supabase
           .from('members')
           .select('*')
-          .ilike('full_name', name)
-          .limit(1)
+          .ilike('full_name', search)
+          .eq('role', 'admin')
           .maybeSingle();
-        
-        data = nameData;
-        error = nameError;
-      }
-
-      if (error) {
-        console.error("Supabase login error:", error);
-        throw new Error("Erreur technique lors de la connexion.");
+        data = nameMatch;
       }
 
       if (!data) {
-        throw new Error("Membre non trouvé. Vérifiez votre code d'accès ou votre nom.");
+        throw new Error("Clé d'accès incorrecte. Les membres doivent utiliser leur ID unique.");
       }
-      
+
       const member = mapMember(data);
       return {
         success: true,
@@ -179,14 +197,20 @@ export const api = {
   },
   members: {
     list: async (): Promise<Member[]> => {
+      const cached = getCached('members_list');
+      if (cached) return cached;
+
       const { data, error } = await supabase
         .from('members')
         .select('*')
         .order('full_name');
       if (error) throw error;
-      return (data || []).map(mapMember);
+      const mapped = (data || []).map(mapMember);
+      setCache('members_list', mapped);
+      return mapped;
     },
     create: async (member: Partial<Member>) => {
+      clearCache('members_list');
       const dbData = mapToMemberDB(member);
       // Ensure we have an ID for Supabase if not provided
       if (!dbData.id) {
@@ -201,6 +225,7 @@ export const api = {
       return mapMember(data);
     },
     delete: async (id: string) => {
+      clearCache('members_list');
       const { error } = await supabase
         .from('members')
         .delete()
@@ -209,6 +234,7 @@ export const api = {
       return { success: true };
     },
     update: async (id: string, member: Partial<Member>) => {
+      clearCache('members_list');
       const dbData = mapToMemberDB(member);
       const { data, error } = await supabase
         .from('members')
@@ -230,14 +256,20 @@ export const api = {
   },
   songs: {
     list: async (): Promise<Song[]> => {
+      const cached = getCached('songs_list');
+      if (cached) return cached;
+
       const { data, error } = await supabase
         .from('songs')
         .select('*')
         .order('title');
       if (error) throw error;
-      return (data || []).map(mapSong);
+      const mapped = (data || []).map(mapSong);
+      setCache('songs_list', mapped);
+      return mapped;
     },
     create: async (song: Partial<Song>) => {
+      clearCache('songs_list');
       const dbData = mapToSongDB(song);
       if (!dbData.id) {
         dbData.id = crypto.randomUUID();
@@ -251,6 +283,7 @@ export const api = {
       return mapSong(data);
     },
     delete: async (id: string) => {
+      clearCache('songs_list');
       const { error } = await supabase
         .from('songs')
         .delete()
@@ -259,6 +292,7 @@ export const api = {
       return { success: true };
     },
     update: async (id: string, song: Partial<Song>) => {
+      clearCache('songs_list');
       const dbData = mapToSongDB(song);
       const { data, error } = await supabase
         .from('songs')
@@ -272,14 +306,20 @@ export const api = {
   },
   announcements: {
     list: async (): Promise<Announcement[]> => {
+      const cached = getCached('announcements_list');
+      if (cached) return cached;
+
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []).map(mapAnnouncement);
+      const mapped = (data || []).map(mapAnnouncement);
+      setCache('announcements_list', mapped);
+      return mapped;
     },
     create: async (ann: Partial<Announcement>) => {
+      clearCache('announcements_list');
       const dbData = mapToAnnouncementDB(ann);
       if (!dbData.id) {
         dbData.id = crypto.randomUUID();
@@ -293,6 +333,7 @@ export const api = {
       return mapAnnouncement(data);
     },
     delete: async (id: string) => {
+      clearCache('announcements_list');
       const { error } = await supabase
         .from('announcements')
         .delete()
@@ -301,6 +342,7 @@ export const api = {
       return { success: true };
     },
     update: async (id: string, ann: Partial<Announcement>) => {
+      clearCache('announcements_list');
       const dbData = mapToAnnouncementDB(ann);
       const { data, error } = await supabase
         .from('announcements')
@@ -314,14 +356,20 @@ export const api = {
   },
   instruments: {
     list: async (): Promise<Instrument[]> => {
+      const cached = getCached('instruments_list');
+      if (cached) return cached;
+
       const { data, error } = await supabase
         .from('instruments')
         .select('*')
         .order('name');
       if (error) throw error;
-      return (data || []).map(mapInstrument);
+      const mapped = (data || []).map(mapInstrument);
+      setCache('instruments_list', mapped);
+      return mapped;
     },
     create: async (inst: Partial<Instrument>) => {
+      clearCache('instruments_list');
       const dbData = mapToInstrumentDB(inst);
       if (!dbData.id) {
         dbData.id = crypto.randomUUID();
@@ -335,6 +383,7 @@ export const api = {
       return mapInstrument(data);
     },
     delete: async (id: string) => {
+      clearCache('instruments_list');
       const { error } = await supabase
         .from('instruments')
         .delete()
@@ -343,6 +392,7 @@ export const api = {
       return { success: true };
     },
     update: async (id: string, inst: Partial<Instrument>) => {
+      clearCache('instruments_list');
       const dbData = mapToInstrumentDB(inst);
       const { data, error } = await supabase
         .from('instruments')
@@ -356,14 +406,20 @@ export const api = {
   },
   rehearsals: {
     list: async (): Promise<Rehearsal[]> => {
+      const cached = getCached('rehearsals_list');
+      if (cached) return cached;
+
       const { data, error } = await supabase
         .from('rehearsals')
         .select('*')
         .order('date', { ascending: false });
       if (error) throw error;
-      return (data || []).map(mapRehearsal);
+      const mapped = (data || []).map(mapRehearsal);
+      setCache('rehearsals_list', mapped);
+      return mapped;
     },
     create: async (rehearsal: Partial<Rehearsal>) => {
+      clearCache('rehearsals_list');
       const dbData = mapToRehearsalDB(rehearsal);
       if (!dbData.id) {
         dbData.id = crypto.randomUUID();
@@ -377,6 +433,7 @@ export const api = {
       return mapRehearsal(data);
     },
     delete: async (id: string) => {
+      clearCache('rehearsals_list');
       const { error } = await supabase
         .from('rehearsals')
         .delete()

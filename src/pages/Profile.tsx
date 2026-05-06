@@ -118,9 +118,11 @@ export default function Profile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Card: Avatar & Stats */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col items-center">
-            <div className="relative group">
-              <div className={`w-32 h-32 rounded-full flex items-center justify-center text-[#D4AF37] text-4xl font-black border-4 border-white shadow-xl overflow-hidden transition-all ${isEditing ? 'ring-4 ring-[#D4AF37]/30 scale-105' : ''}`}>
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col items-center relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-[#002B5B] to-[#004a9d] z-0" />
+            
+            <div className="relative z-10 mt-4">
+              <div className={`w-32 h-32 rounded-full flex items-center justify-center text-[#D4AF37] text-4xl font-black border-4 border-white shadow-xl overflow-hidden transition-all bg-white ${isEditing ? 'ring-4 ring-[#D4AF37]/30 scale-105' : ''}`}>
                 {formData.avatarUrl ? (
                   <img src={formData.avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -155,21 +157,41 @@ export default function Profile() {
               )}
             </div>
             
-            <h2 className="mt-6 text-xl font-black text-[#002B5B] uppercase tracking-tight">{memberData.fullName}</h2>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full flex items-center gap-1">
-                 {memberData.role === 'admin' ? <Shield size={12} /> : <User size={12} />}
-                 {memberData.role}
-              </span>
-              <span className="px-3 py-1 bg-green-50 text-green-600 text-[10px] font-black uppercase rounded-full flex items-center gap-1">
-                Actif
-              </span>
+            <div className="relative z-10 text-center mt-6">
+              <h2 className="text-xl font-black text-[#002B5B] uppercase tracking-tight">{memberData.fullName}</h2>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full flex items-center gap-1">
+                   {memberData.role === 'admin' ? <Shield size={12} /> : <User size={12} />}
+                   {memberData.role}
+                </span>
+                <span className="px-3 py-1 bg-green-50 text-green-600 text-[10px] font-black uppercase rounded-full flex items-center gap-1">
+                  Active
+                </span>
+              </div>
+            </div>
+
+            {/* Access Key Section */}
+            <div className="w-full mt-8 p-6 bg-amber-50 rounded-2xl border border-amber-100/50 relative group/key">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Clé d'Accès Personnelle</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-black text-[#002B5B] tracking-widest bg-white px-4 py-1.5 rounded-xl border border-amber-100 shadow-sm">
+                    {memberData.accessName || memberData.id}
+                  </span>
+                </div>
+                <p className="mt-3 text-[9px] text-amber-600/70 text-center font-bold italic leading-tight">
+                  Identifiant unique pour toutes vos connexions au portail.
+                </p>
+              </div>
+              <div className="absolute top-2 right-2 opacity-10">
+                <Shield size={24} className="text-amber-500" />
+              </div>
             </div>
 
             {!isEditing && (
               <button 
                 onClick={() => setIsEditing(true)}
-                className="mt-6 w-full py-3 px-4 bg-[#D4AF37] text-[#002B5B] font-black rounded-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-md"
+                className="mt-6 w-full py-4 px-4 bg-[#D4AF37] text-[#002B5B] font-black rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-[#D4AF37]/20"
               >
                 <Camera size={18} />
                 Modifier le profil
@@ -203,18 +225,23 @@ export default function Profile() {
 
         {/* Right Card: Form */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-              <h3 className="text-lg font-black text-[#002B5B] flex items-center gap-2">
-                Informations du compte
-              </h3>
+          <div className="bg-white rounded-[2.5rem] shadow-[0_10px_50px_rgba(0,0,0,0.03)] border border-slate-50 overflow-hidden">
+            <div className="p-8 md:p-10 border-b border-slate-50 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 rounded-xl">
+                  <Shield className="text-[#002B5B]" size={20} />
+                </div>
+                <h3 className="text-xl font-black text-[#002B5B]">
+                  Informations du compte
+                </h3>
+              </div>
               <button 
                 onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                 disabled={loading}
-                className={`px-5 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 transition-all shadow-sm ${
+                className={`px-6 py-3 rounded-2xl text-sm font-black flex items-center gap-2 transition-all shadow-xl active:scale-95 ${
                   isEditing 
-                    ? 'bg-[#002B5B] text-white hover:bg-[#003d82]' 
-                    : 'bg-white border border-slate-200 text-[#002B5B] hover:bg-slate-50'
+                    ? 'bg-[#002B5B] text-white hover:bg-[#003d82] shadow-[#002B5B]/20' 
+                    : 'bg-white border border-slate-100 text-[#002B5B] hover:bg-slate-50'
                 }`}
               >
                 {isEditing ? (
@@ -225,74 +252,82 @@ export default function Profile() {
               </button>
             </div>
 
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <User size={14} className="text-[#D4AF37]" /> Nom complet
+            <div className="p-8 md:p-12 space-y-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    Nom complet d'affichage
                   </label>
-                  <input 
-                    type="text"
-                    disabled={!isEditing}
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-[#002B5B] focus:ring-2 focus:ring-[#D4AF37]/20 outline-none disabled:opacity-70"
-                  />
+                  <div className="relative group">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#D4AF37] transition-colors" size={18} />
+                    <input 
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-base font-bold text-[#002B5B] focus:ring-4 focus:ring-[#D4AF37]/10 focus:bg-white focus:border-[#D4AF37]/30 outline-none transition-all disabled:opacity-50"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Phone size={14} className="text-[#D4AF37]" /> Numéro de téléphone
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    Numéro de Téléphone
                   </label>
-                  <input 
-                    type="tel"
-                    disabled={!isEditing}
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-[#002B5B] focus:ring-2 focus:ring-[#D4AF37]/20 outline-none disabled:opacity-70"
-                    placeholder="+261 ..."
-                  />
+                  <div className="relative group">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#D4AF37] transition-colors" size={18} />
+                    <input 
+                      type="tel"
+                      disabled={!isEditing}
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-base font-bold text-[#002B5B] focus:ring-4 focus:ring-[#D4AF37]/10 focus:bg-white focus:border-[#D4AF37]/30 outline-none transition-all disabled:opacity-50"
+                      placeholder="+261 ..."
+                    />
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Shield size={14} className="text-[#D4AF37]" /> Pupitre / Voix
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    Pupitre / Registre Vocal
                   </label>
                   <select
                     disabled={!isEditing}
                     value={formData.voiceType}
                     onChange={(e) => setFormData({ ...formData, voiceType: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-[#002B5B] focus:ring-2 focus:ring-[#D4AF37]/20 outline-none disabled:opacity-70 appearance-none"
+                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-base font-bold text-[#002B5B] focus:ring-4 focus:ring-[#D4AF37]/10 focus:bg-white focus:border-[#D4AF37]/30 outline-none transition-all disabled:opacity-50 appearance-none cursor-pointer"
                   >
-                    <option value="">Sélectionner...</option>
+                    <option value="">Sélectionner votre voix...</option>
                     <option value="Soprano">Soprano</option>
                     <option value="Alto">Alto</option>
                     <option value="Ténor">Ténor</option>
                     <option value="Basse">Basse</option>
                   </select>
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Save size={14} className="text-[#D4AF37]" /> Instrument (optionnel)
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    Instrument de prédilection
                   </label>
                   <input 
                     type="text"
                     disabled={!isEditing}
                     value={formData.instrument}
                     onChange={(e) => setFormData({ ...formData, instrument: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-[#002B5B] focus:ring-2 focus:ring-[#D4AF37]/20 outline-none disabled:opacity-70"
-                    placeholder="Piano, Guitare, etc."
+                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-base font-bold text-[#002B5B] focus:ring-4 focus:ring-[#D4AF37]/10 focus:bg-white focus:border-[#D4AF37]/30 outline-none transition-all disabled:opacity-50"
+                    placeholder="Ex: Piano"
                   />
                 </div>
               </div>
 
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-start gap-4">
-                <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
-                  <CheckCircle2 size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-[#002B5B]">Statut du compte vérifié</p>
-                  <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                    Votre identité a été confirmée par les administrateurs. Vous avez accès à toutes les fonctionnalités du portail EAFA Music.
-                  </p>
+              <div className="pt-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-3xl p-8 border border-blue-100/50 flex items-start gap-6">
+                  <div className="p-4 rounded-2xl bg-white shadow-sm text-blue-600">
+                    <CheckCircle2 size={28} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black text-[#002B5B]">Statut du compte vérifié</p>
+                    <p className="text-sm text-slate-500 leading-relaxed mt-2 max-w-lg">
+                      Votre identité a été confirmée par les administrateurs du portail. Vous bénéficiez de l'accès total aux ressources musicales.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

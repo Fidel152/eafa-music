@@ -5,6 +5,7 @@ interface NotificationContextType {
   permission: NotificationPermission;
   requestPermission: () => Promise<void>;
   sendNotification: (title: string, options?: any) => void;
+  playSound: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -14,6 +15,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
 
+  const playSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('Audio playback prevented by browser policy. Interaction required.', e));
+    } catch (err) {
+      console.error('Failed to play sound:', err);
+    }
+  };
+
   const requestPermission = async () => {
     if (typeof Notification === 'undefined') return;
     
@@ -22,27 +33,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     
     if (result === 'granted') {
       toast.success('Notifications activées !');
-      // Test sound
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.play().catch(() => {});
+      playSound();
     } else if (result === 'denied') {
       toast.error('Notifications bloquées par le navigateur');
     }
   };
 
   const sendNotification = (title: string, options?: NotificationOptions) => {
+    playSound(); // Play sound regardless of browser notification permission for in-app feedback
+    
     if (permission === 'granted') {
       // Create notification
       const notification = new Notification(title, {
         icon: '/favicon.ico',
         badge: '/favicon.ico',
         vibrate: [200, 100, 200],
+        silent: true, // We already played the sound manually for control
         ...options
       } as any);
-
-      // Simple notification sound
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.play().catch(e => console.log('Audio playback prevented', e));
 
       notification.onclick = () => {
         window.focus();
@@ -59,7 +67,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ permission, requestPermission, sendNotification }}>
+    <NotificationContext.Provider value={{ permission, requestPermission, sendNotification, playSound }}>
       {children}
     </NotificationContext.Provider>
   );
