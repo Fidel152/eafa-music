@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Rehearsal, Attendance, Member } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -40,6 +40,9 @@ export default function Rehearsals() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
+    if (getCached('rehearsals_list')) {
+      setLoading(false);
+    }
     loadData();
   }, []);
 

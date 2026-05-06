@@ -118,34 +118,47 @@ const mapComment = (c: any): Comment => ({
   parentId: c.parent_id
 });
 
-const mapMessage = (m: any): Message => ({
-  ...m,
-  senderId: m.sender_id,
-  receiverId: m.receiver_id,
-  fileUrl: m.file_url,
-  createdAt: m.created_at,
-  read: m.read || false,
-  deleted: m.deleted || false
-});
+const mapMessage = (m: any): Message => {
+  if (!m) return null as any;
+  return {
+    id: m.id,
+    senderId: m.sender_id,
+    receiverId: m.receiver_id,
+    content: m.content || '',
+    type: m.type || 'text',
+    fileUrl: m.file_url,
+    createdAt: m.created_at || new Date().toISOString(),
+    read: !!m.read,
+    deleted: !!m.deleted
+  };
+};
 
 // Simple in-memory cache to improve responsiveness
 const _cache: Record<string, { data: any, timestamp: number }> = {};
-const CACHE_TTL = 60000; // 60 seconds
+const CACHE_TTL = 180000; // 3 minutes for general data
+const SHORT_CACHE_TTL = 10000; // 10 seconds for volatile data
 
-const getCached = (key: string) => {
+export const getCached = (key: string, ttl = CACHE_TTL) => {
   const entry = _cache[key];
-  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+  if (entry && Date.now() - entry.timestamp < ttl) {
     return entry.data;
   }
   return null;
 };
 
-const setCache = (key: string, data: any) => {
+export const setCache = (key: string, data: any) => {
   _cache[key] = { data, timestamp: Date.now() };
 };
 
-const clearCache = (key: string) => {
-  delete _cache[key];
+export const clearCache = (key: string) => {
+  if (key.endsWith('*')) {
+    const prefix = key.slice(0, -1);
+    Object.keys(_cache).forEach(k => {
+      if (k.startsWith(prefix)) delete _cache[k];
+    });
+  } else {
+    delete _cache[key];
+  }
 };
 
 export const api = {
@@ -159,12 +172,19 @@ export const api = {
       let data = null;
 
       // 1. Try direct ID match (Exact)
-      const { data: idMatch } = await supabase
-        .from('members')
-        .select('*')
-        .eq('id', search)
-        .maybeSingle();
-      data = idMatch;
+      try {
+        const { data: idMatch, error: idError } = await supabase
+          .from('members')
+          .select('*')
+          .eq('id', search)
+          .maybeSingle();
+        
+        if (!idError) {
+          data = idMatch;
+        }
+      } catch (e) {
+        // likely type mismatch if search is not UUID and column is UUID
+      }
 
       // 2. Try Name match ONLY if they are an ADMIN
       if (!data) {
@@ -505,24 +525,82 @@ export const api = {
   },
   messages: {
     listConversations: async (userId: string): Promise<Message[]> => {
-      const { data, error } = await supabase
+      const cacheKey = `convs_${userId}`;
+      const cached = getCached(cacheKey, SHORT_CACHE_TTL);
+      if (cached) return cached;
+
+      // Limit to last 50 messages to determine active conversations quickly
+      const { data: sent, error: errorSent } = await supabase
         .from('messages')
         .select('*')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []).map(mapMessage);
+        .eq('sender_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const { data: received, error: errorReceived } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('receiver_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (errorSent) throw errorSent;
+      if (errorReceived) throw errorReceived;
+
+      const combined = [...(sent || []), ...(received || [])];
+      combined.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+      
+      const mapped = combined.map(m => mapMessage(m)).filter(m => m !== null);
+      setCache(cacheKey, mapped);
+      return mapped;
     },
     listThread: async (userId: string, otherId: string): Promise<Message[]> => {
-      const { data, error } = await supabase
+      const cacheKey = `thread_${userId}_${otherId}`;
+      const cached = getCached(cacheKey, SHORT_CACHE_TTL);
+      if (cached) return cached;
+
+      // Fetch last 50 messages for the thread
+      const { data: sent, error: errorSent } = await supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return (data || []).map(mapMessage);
+        .eq('sender_id', userId)
+        .eq('receiver_id', otherId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      const { data: received, error: errorReceived } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('sender_id', otherId)
+        .eq('receiver_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (errorSent) throw errorSent;
+      if (errorReceived) throw errorReceived;
+
+      const combined = [...(sent || []), ...(received || [])];
+      combined.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
+      
+      const mapped = combined.map(m => mapMessage(m)).filter(m => m !== null);
+      // Short TTL for messages thread (10s)
+      _cache[cacheKey] = { data: mapped, timestamp: Date.now() - 50000 }; 
+      return mapped;
     },
     send: async (message: Partial<Message> & { type?: string, fileUrl?: string }) => {
+      // Clear relevant caches
+      delete _cache[`convs_${message.senderId}`];
+      delete _cache[`convs_${message.receiverId}`];
+      delete _cache[`thread_${message.senderId}_${message.receiverId}`];
+      delete _cache[`thread_${message.receiverId}_${message.senderId}`];
       const dbData: any = {
         sender_id: message.senderId,
         receiver_id: message.receiverId,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -36,6 +36,9 @@ export default function Songs() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
+    if (getCached('songs_list')) {
+      setLoading(false);
+    }
     loadSongs();
   }, []);
 

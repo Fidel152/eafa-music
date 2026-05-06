@@ -30,34 +30,53 @@ const NavItem = ({ item, isActive, onClick, variants }: any) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const Icon = item.icon;
 
+  const handlePrefetch = () => {
+    // Prefetch data based on path to populate cache early
+    if (item.path === '/members') api.members.list().catch(() => {});
+    if (item.path === '/songs') api.songs.list().catch(() => {});
+    if (item.path === '/announcements') api.announcements.list().catch(() => {});
+    if (item.path === '/instruments') api.instruments.list().catch(() => {});
+    if (item.path === '/rehearsals') api.rehearsals.list().catch(() => {});
+    if (item.path === '/messages' && user) api.messages.listConversations(user.id).catch(() => {});
+  };
+
   useEffect(() => {
     if (item.badge && user) {
       const checkMessages = async () => {
         try {
           const messages = await api.messages.listConversations(user.id);
-          const unread = messages.filter((m: any) => m.receiverId === user.id && !m.read).length;
+          // Only count messages where user is receiver and hasn't read them
+          const unread = messages.filter((m: any) => m && m.receiverId === user.id && !m.read).length;
           setUnreadCount(unread);
         } catch (e) {
-          console.error(e);
+          console.error("Unread count error:", e);
         }
       };
       
       checkMessages();
 
+      // IMPORTANT: Filter by receiver_id to avoid receiving all database messages
       const channel = supabase
-        .channel(`nav-messages-${item.name}`)
+        .channel(`nav-unread-${user.id}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'messages' },
-          (payload) => {
-            const newest = payload.new as any;
-            const oldest = payload.old as any;
-            if (newest && (newest.sender_id === user.id || newest.receiver_id === user.id)) {
-              checkMessages();
-            } else if (oldest && (oldest.sender_id === user.id || oldest.receiver_id === user.id)) {
-              checkMessages();
-            }
-          }
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages',
+            filter: `receiver_id=eq.${user.id}`
+          },
+          () => checkMessages()
+        )
+        .on(
+          'postgres_changes',
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'messages',
+            filter: `receiver_id=eq.${user.id}`
+          },
+          () => checkMessages()
         )
         .subscribe();
 
@@ -68,7 +87,7 @@ const NavItem = ({ item, isActive, onClick, variants }: any) => {
   }, [item.badge, user, item.name]);
 
   return (
-    <Link to={item.path} onClick={onClick}>
+    <Link to={item.path} onClick={onClick} onMouseEnter={handlePrefetch}>
       <motion.div
         variants={variants}
         whileHover="hover"
@@ -173,12 +192,14 @@ export default function DashboardLayout() {
           <button
             onClick={requestPermission}
             className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all text-xs font-black uppercase tracking-widest bg-white/5",
-              permission === 'granted' ? "text-emerald-400" : "text-amber-400"
+              "flex items-center gap-3 w-full px-4 py-4 rounded-xl transition-all text-[10px] font-black uppercase tracking-[0.2em] shadow-sm",
+              permission === 'granted' 
+                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                : "bg-amber-500 text-[#002B5B] hover:bg-amber-400 animate-pulse border-2 border-white/20"
             )}
           >
             {permission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
-            <span>{permission === 'granted' ? 'Notifications Activées' : 'Activer Notifications'}</span>
+            <span>{permission === 'granted' ? 'Notifications OK' : 'Alerte : Activer Notifications'}</span>
           </button>
 
           <button

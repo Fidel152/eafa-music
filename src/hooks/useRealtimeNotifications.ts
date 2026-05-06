@@ -11,49 +11,55 @@ export function useRealtimeNotifications() {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Listen for new messages
+    // 1. Listen for new messages - scoped to user for better performance
     const messagesChannel = supabase
-      .channel('public:messages')
+      .channel(`user-messages-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'public',
+          schema: 'public', 
           table: 'messages',
           filter: `receiver_id=eq.${user.id}`,
         },
         async (payload) => {
-          const newMessage = payload.new;
+          console.log("Real-time message received:", payload);
+          const newMessage = payload.new as any;
+          if (!newMessage || !newMessage.sender_id) return;
           
-          // Get sender info for a better notification
-          const { data: sender } = await supabase
-            .from('members')
-            .select('full_name')
-            .eq('id', newMessage.sender_id)
-            .single();
+          try {
+            // Get sender info for a better notification
+            const { data: sender } = await supabase
+              .from('members')
+              .select('full_name')
+              .eq('id', newMessage.sender_id)
+              .maybeSingle();
 
-          const senderName = sender?.full_name || 'Un membre';
+            const senderName = sender?.full_name || 'Un membre';
 
-          // Browser notification
-          sendNotification(`Nouveau message de ${senderName}`, {
-            body: newMessage.content,
-            tag: `msg-${newMessage.id}`
-          });
+            // Browser notification
+            sendNotification(`Nouveau message de ${senderName}`, {
+              body: newMessage.content || '',
+              tag: `msg-${newMessage.id}`
+            });
 
-          // In-app toast
-          toast.info(`Message de ${senderName}`, {
-            description: newMessage.content.length > 50 
-              ? newMessage.content.substring(0, 50) + '...' 
-              : newMessage.content,
-            duration: 5000,
-          });
+            // In-app toast
+            toast.info(`Message de ${senderName}`, {
+              description: (newMessage.content || '').length > 50 
+                ? (newMessage.content || '').substring(0, 50) + '...' 
+                : (newMessage.content || ''),
+              duration: 5000,
+            });
+          } catch (err) {
+            console.error("Error processing realtime message:", err);
+          }
         }
       )
       .subscribe();
 
     // 2. Listen for new announcements
     const announcementsChannel = supabase
-      .channel('public:announcements')
+      .channel(`user-announcements-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -62,17 +68,19 @@ export function useRealtimeNotifications() {
           table: 'announcements'
         },
         (payload) => {
-          const newAnnouncement = payload.new;
+          console.log("Real-time announcement received:", payload);
+          const newAnnouncement = payload.new as any;
+          if (!newAnnouncement) return;
 
           // External notification
           sendNotification('Nouvelle annonce !', {
-            body: newAnnouncement.title,
+            body: newAnnouncement.title || '',
             tag: `ann-${newAnnouncement.id}`
           });
 
           // In-app toast
           toast.success('📢 Nouvelle annonce', {
-            description: newAnnouncement.title,
+            description: newAnnouncement.title || '',
             duration: 8000,
           });
         }

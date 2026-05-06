@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Member } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -39,6 +39,10 @@ export default function Members() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
+    // Check if we have cache to avoid showing a blank screen if navigated before
+    if (getCached('members_list')) {
+      setLoading(false);
+    }
     loadMembers();
     const interval = setInterval(loadMembers, 15000); // Refresh list every 15s for online status
     return () => clearInterval(interval);

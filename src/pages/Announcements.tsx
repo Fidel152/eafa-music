@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Announcement } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -38,6 +38,9 @@ export default function Announcements() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
+    if (getCached('announcements_list')) {
+      setLoading(false);
+    }
     loadAnnouncements();
   }, []);
 

@@ -13,7 +13,7 @@ import {
   Clock
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Announcement, Message, Member, Rehearsal } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,7 +36,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
+      // Don't show loading spinner if we have cached data for at least one major resource
+      const hasSomeCache = !!getCached('announcements_list') || !!getCached('members_list');
+      if (!hasSomeCache) setIsLoading(true);
+
       try {
         const results = await Promise.allSettled([
           api.announcements.list(),

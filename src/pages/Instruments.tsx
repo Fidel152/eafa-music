@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { Instrument } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -38,6 +38,9 @@ export default function Instruments() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
+    if (getCached('instruments_list')) {
+      setLoading(false);
+    }
     loadInstruments();
   }, []);
 

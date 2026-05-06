@@ -15,6 +15,7 @@ export default function Chat() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -88,16 +89,24 @@ export default function Chat() {
     loadMembers();
     loadConversations();
     
-    // Real-time subscription for messages
+    // Real-time subscription for messages - only for THIS user
     const channel = supabase
-      .channel('public:messages')
+      .channel(`chat-general-${user.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages'
+        },
         (payload) => {
           const newest = payload.new as any;
-          if (user && (newest.sender_id === user.id || newest.receiver_id === user.id)) {
+          if (!newest) return;
+          
+          // If message involves current user
+          if (newest.sender_id === user.id || newest.receiver_id === user.id) {
             loadConversations();
+            // If message is from/to currently selected conversation
             if (selectedMember && (newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id)) {
               loadMessages();
             }
@@ -124,8 +133,6 @@ export default function Chat() {
   useEffect(() => {
     if (selectedMember) {
       loadMessages();
-      const interval = setInterval(loadMessages, 5000); // Poll for new messages every 5s
-      return () => clearInterval(interval);
     }
   }, [selectedMember]);
 
@@ -153,13 +160,17 @@ export default function Chat() {
 
   const loadMessages = async () => {
     if (!user || !selectedMember) return;
+    setLoadingMessages(true);
     try {
       const data = await api.messages.listThread(user.id, selectedMember.id);
-      setMessages(data);
+      setMessages(data || []);
       // Mark as read
       api.messages.markAsRead(user.id, selectedMember.id).catch(console.error);
     } catch (error) {
       console.error("Load messages error:", error);
+      setMessages([]);
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
@@ -284,49 +295,56 @@ export default function Chat() {
         </div>
 
         <div className="flex-1 overflow-y-auto bg-white">
-          {filteredMembers.map(m => {
-            const hasUnread = getUnreadStatus(m.id);
-            const isSelected = selectedMember?.id === m.id;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setSelectedMember(m)}
-                className={`w-full p-4 flex items-center gap-3 transition-all border-b border-slate-50 relative group ${
-                  isSelected 
-                    ? 'bg-[#D4AF37]/10' 
-                    : hasUnread 
-                      ? 'bg-amber-50 hover:bg-amber-100' 
-                      : 'hover:bg-slate-50'
-                }`}
-              >
-                <div className="relative shrink-0">
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-slate-100 border-2 ${isSelected ? 'border-[#D4AF37]' : 'border-white'} shadow-sm flex items-center justify-center`}>
-                    {m.avatarUrl ? (
-                      <img src={m.avatarUrl} alt={m.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <span className="text-[#002B5B] font-black text-sm md:text-base">{m.fullName.charAt(0)}</span>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-3">
+              <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chargement...</p>
+            </div>
+          ) : (
+            filteredMembers.map(m => {
+              const hasUnread = getUnreadStatus(m.id);
+              const isSelected = selectedMember?.id === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMember(m)}
+                  className={`w-full p-4 flex items-center gap-3 transition-all border-b border-slate-50 relative group ${
+                    isSelected 
+                      ? 'bg-[#D4AF37]/10' 
+                      : hasUnread 
+                        ? 'bg-amber-50 hover:bg-amber-100' 
+                        : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="relative shrink-0">
+                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-slate-100 border-2 ${isSelected ? 'border-[#D4AF37]' : 'border-white'} shadow-sm flex items-center justify-center`}>
+                      {m.avatarUrl ? (
+                        <img src={m.avatarUrl} alt={m.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className="text-[#002B5B] font-black text-sm md:text-base">{m.fullName.charAt(0)}</span>
+                      )}
+                    </div>
+                    {isOnline(m.lastSeen) && (
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-sm" />
                     )}
                   </div>
-                  {isOnline(m.lastSeen) && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-sm" />
-                  )}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={`text-xs md:text-sm font-black truncate ${isSelected ? 'text-[#002B5B]' : 'text-slate-700'}`}>
-                      {m.fullName}
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-xs md:text-sm font-black truncate ${isSelected ? 'text-[#002B5B]' : 'text-slate-700'}`}>
+                        {m.fullName}
+                      </p>
+                      {hasUnread && (
+                        <span className="bg-red-500 text-white text-[7px] font-black uppercase px-1 py-0.5 rounded shrink-0">New</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase truncate tracking-tight">
+                      {m.voiceType || 'Membre'} • {m.role === 'admin' ? 'Coordinateur' : 'Choriste'}
                     </p>
-                    {hasUnread && (
-                      <span className="bg-red-500 text-white text-[7px] font-black uppercase px-1 py-0.5 rounded shrink-0">New</span>
-                    )}
                   </div>
-                  <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase truncate tracking-tight">
-                    {m.voiceType || 'Membre'} • {m.role === 'admin' ? 'Coordinateur' : 'Choriste'}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })
+          )}
           {filteredMembers.length === 0 && !loading && (
             <div className="p-8 text-center">
               <p className="text-slate-400 text-xs italic">Aucun membre trouvé</p>
@@ -364,7 +382,13 @@ export default function Chat() {
                   <h3 className="font-black text-[#002B5B] text-sm md:text-base leading-tight truncate">{selectedMember.fullName}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      {isOnline(selectedMember.lastSeen) ? 'En ligne' : `Dernier passage à ${format(new Date(selectedMember.lastSeen || Date.now()), 'HH:mm')}`}
+                      {isOnline(selectedMember.lastSeen) ? 'En ligne' : `Dernier passage à ${(() => {
+                        try {
+                          return format(new Date(selectedMember.lastSeen || Date.now()), 'HH:mm');
+                        } catch (e) {
+                          return '--:--';
+                        }
+                      })()}`}
                     </span>
                   </div>
                 </div>
@@ -383,19 +407,26 @@ export default function Chat() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/30">
-              <AnimatePresence initial={false}>
-                {messages.map((msg, index) => {
-                  const isMe = msg.senderId === user?.id;
-                  const prevMsg = index > 0 ? messages[index - 1] : null;
-                  const showAvatar = !isMe && (!prevMsg || prevMsg.senderId !== msg.senderId);
+              {loadingMessages && messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chargement des messages...</p>
+                </div>
+              ) : (
+                <AnimatePresence initial={false}>
+                  {(messages || []).map((msg, index) => {
+                    if (!msg) return null;
+                    const isMe = msg.senderId === user?.id;
+                    const prevMsg = index > 0 ? messages[index - 1] : null;
+                    const showAvatar = !isMe && (!prevMsg || prevMsg.senderId !== msg.senderId);
 
-                  return (
-                    <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}
-                      >
+                    return (
+                      <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}
+                        >
                         {!isMe && showAvatar && (
                           <div className="w-8 h-8 rounded-full bg-[#002B5B] overflow-hidden flex items-center justify-center text-[#D4AF37] text-[10px] font-black shrink-0 shadow-sm">
                             {selectedMember.avatarUrl ? (
@@ -460,17 +491,24 @@ export default function Chat() {
 
                           <div className={`flex items-center gap-1.5 mt-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
                             <span className={`text-[8px] md:text-[9px] font-bold opacity-60`}>
-                              {format(new Date(msg.createdAt), 'HH:mm')}
+                              {(() => {
+                                try {
+                                  return format(new Date(msg.createdAt), 'HH:mm');
+                                } catch (e) {
+                                  return '--:--';
+                                }
+                              })()}
                             </span>
                             {isMe && !msg.deleted && (
                               <CheckCircle2 size={10} className={msg.read ? 'text-[#D4AF37]' : 'text-slate-400'} />
                             )}
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                })}
-              </AnimatePresence>
+                        </motion.div>
+                      );
+                  })}
+                </AnimatePresence>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
@@ -586,7 +624,13 @@ export default function Chat() {
                         <div>
                           <p className="text-[10px] text-slate-400 font-black uppercase">Date & Heure</p>
                           <p className="text-sm font-bold text-[#002B5B]">
-                            {format(new Date(selectedMessage.createdAt), "eeee d MMMM 'à' HH:mm", { locale: fr })}
+                            {(() => {
+                              try {
+                                return format(new Date(selectedMessage.createdAt), "eeee d MMMM 'à' HH:mm", { locale: fr });
+                              } catch (e) {
+                                return 'Date inconnue';
+                              }
+                            })()}
                           </p>
                         </div>
                       </div>
