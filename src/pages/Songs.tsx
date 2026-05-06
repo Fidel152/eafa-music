@@ -17,8 +17,8 @@ import CommentSection from '../components/CommentSection';
 
 export default function Songs() {
   const { user } = useAuth();
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [songs, setSongs] = useState<Song[]>(getCached('songs_list') || []);
+  const [loading, setLoading] = useState(!getCached('songs_list'));
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,9 +36,6 @@ export default function Songs() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    if (getCached('songs_list')) {
-      setLoading(false);
-    }
     loadSongs();
   }, []);
 

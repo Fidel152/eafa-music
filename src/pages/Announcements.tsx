@@ -21,8 +21,8 @@ import CommentSection from '../components/CommentSection';
 
 export default function Announcements() {
   const { user } = useAuth();
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(getCached('announcements_list') || []);
+  const [loading, setLoading] = useState(!getCached('announcements_list'));
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingAnnouncement, setViewingAnnouncement] = useState<Announcement | null>(null);
@@ -38,9 +38,6 @@ export default function Announcements() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    if (getCached('announcements_list')) {
-      setLoading(false);
-    }
     loadAnnouncements();
   }, []);
 

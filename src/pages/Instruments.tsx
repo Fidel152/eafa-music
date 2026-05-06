@@ -20,8 +20,8 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function Instruments() {
   const { user } = useAuth();
-  const [instruments, setInstruments] = useState<Instrument[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [instruments, setInstruments] = useState<Instrument[]>(getCached('instruments_list') || []);
+  const [loading, setLoading] = useState(!getCached('instruments_list'));
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -38,9 +38,6 @@ export default function Instruments() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    if (getCached('instruments_list')) {
-      setLoading(false);
-    }
     loadInstruments();
   }, []);
 

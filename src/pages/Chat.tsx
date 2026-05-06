@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../lib/api';
+import { api, getCached } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Member, Message } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -11,14 +11,14 @@ import { toast } from 'sonner';
 
 export default function Chat() {
   const { user } = useAuth();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [members, setMembers] = useState<Member[]>(getCached('members_list') || []);
+  const [conversations, setConversations] = useState<any[]>(getCached(`convs_${user?.id}`) || []);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!getCached('members_list') && !getCached(`convs_${user?.id}`));
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showMediaOptions, setShowMediaOptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -132,6 +132,10 @@ export default function Chat() {
 
   useEffect(() => {
     if (selectedMember) {
+      const cachedThread = getCached(`thread_${user?.id}_${selectedMember.id}`);
+      if (cachedThread) {
+        setMessages(cachedThread);
+      }
       loadMessages();
     }
   }, [selectedMember]);

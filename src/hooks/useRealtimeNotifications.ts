@@ -11,6 +11,17 @@ export function useRealtimeNotifications() {
   useEffect(() => {
     if (!user) return;
 
+    // Sound effect for notifications
+    const playNotificationSound = () => {
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.warn("Audio play blocked by browser:", e));
+      } catch (e) {
+        console.error("Sound error:", e);
+      }
+    };
+
     // 1. Listen for new messages - scoped to user for better performance
     const messagesChannel = supabase
       .channel(`user-messages-${user.id}`)
@@ -27,6 +38,8 @@ export function useRealtimeNotifications() {
           const newMessage = payload.new as any;
           if (!newMessage || !newMessage.sender_id) return;
           
+          playNotificationSound();
+
           try {
             // Get sender info for a better notification
             const { data: sender } = await supabase
@@ -71,6 +84,8 @@ export function useRealtimeNotifications() {
           console.log("Real-time announcement received:", payload);
           const newAnnouncement = payload.new as any;
           if (!newAnnouncement) return;
+
+          playNotificationSound();
 
           // External notification
           sendNotification('Nouvelle annonce !', {

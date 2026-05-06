@@ -23,9 +23,9 @@ import { cn } from '../lib/utils';
 
 export default function Rehearsals() {
   const { user } = useAuth();
-  const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [members, setMembers] = useState<Member[]>([]);
+  const [rehearsals, setRehearsals] = useState<Rehearsal[]>(getCached('rehearsals_list') || []);
+  const [loading, setLoading] = useState(!getCached('rehearsals_list'));
+  const [members, setMembers] = useState<Member[]>(getCached('members_list') || []);
   const [attendance, setAttendance] = useState<Record<string, Attendance[]>>({});
   const [selectedRehearsal, setSelectedRehearsal] = useState<Rehearsal | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,9 +40,6 @@ export default function Rehearsals() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    if (getCached('rehearsals_list')) {
-      setLoading(false);
-    }
     loadData();
   }, []);
 

@@ -38,7 +38,19 @@ export default function Dashboard() {
     const fetchData = async () => {
       // Don't show loading spinner if we have cached data for at least one major resource
       const hasSomeCache = !!getCached('announcements_list') || !!getCached('members_list');
-      if (!hasSomeCache) setIsLoading(true);
+      
+      if (hasSomeCache) {
+        setIsLoading(false);
+        // Pre-fill from cache
+        const anns = getCached('announcements_list') || [];
+        const rehs = getCached('rehearsals_list') || [];
+        const members = getCached('members_list') || [];
+        if (anns.length > 0) setLatestAnnouncement(anns[0]);
+        setRecentMembers(members.slice(0, 5));
+        setUpcomingRehearsals(rehs.slice(0, 2));
+      } else {
+        setIsLoading(true);
+      }
 
       try {
         const results = await Promise.allSettled([

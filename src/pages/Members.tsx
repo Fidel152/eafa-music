@@ -24,8 +24,8 @@ import { useNavigate } from 'react-router-dom';
 export default function Members() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<Member[]>(getCached('members_list') || []);
+  const [loading, setLoading] = useState(!getCached('members_list'));
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,12 +39,8 @@ export default function Members() {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    // Check if we have cache to avoid showing a blank screen if navigated before
-    if (getCached('members_list')) {
-      setLoading(false);
-    }
     loadMembers();
-    const interval = setInterval(loadMembers, 15000); // Refresh list every 15s for online status
+    const interval = setInterval(loadMembers, 15000); 
     return () => clearInterval(interval);
   }, []);
 
