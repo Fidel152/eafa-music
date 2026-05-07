@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api, getCached } from '../lib/api';
+import { api, getCached, mapMessage } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Member, Message } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { Search, Send, User, Clock, Phone, Mail, Image as ImageIcon, CheckCircle2, ChevronLeft, Trash2, Info, Paperclip, Mic, Video, Camera, MoreVertical, X, Play, Volume2, Smile, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 
 export default function Chat() {
   const { user } = useAuth();
+  const { activeConversationId, setActiveConversationId } = useNotifications();
   const [members, setMembers] = useState<Member[]>(getCached('members_list') || []);
   const [conversations, setConversations] = useState<any[]>(getCached(`convs_${user?.id}`) || []);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -104,22 +106,29 @@ export default function Chat() {
           table: 'messages'
         },
         (payload) => {
-          const newest = payload.new as any;
-          if (!newest) return;
+          const newestRaw = payload.new as any;
+          if (!newestRaw) return;
+          
+          const newest = mapMessage(newestRaw);
           
           // If message involves current user or is a group message
-          const isMe = newest.sender_id === user.id || newest.receiver_id === user.id;
-          const isGroup = newest.type && String(newest.type).startsWith('group');
+          const isMe = newest.senderId === user.id || newest.receiverId === user.id;
+          const isGroup = newest.receiverId === 'general';
 
           if (isMe || isGroup) {
             loadConversations();
             // If message is from/to currently selected conversation
             if (selectedMember) {
-              const isGroupThread = selectedMember.id === 'general' && newest.type && String(newest.type).startsWith('group');
-              const isPrivateThread = newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id;
+              const isGroupThread = selectedMember.id === 'general' && isGroup;
+              const isPrivateThread = newest.senderId === selectedMember.id || newest.receiverId === selectedMember.id;
               
               if (isGroupThread || isPrivateThread) {
-                loadMessages();
+                // If it's not from us (the sender already has it or calls loadMessages)
+                // Actually, let's just append it if it's not already there
+                setMessages(prev => {
+                  if (prev.some(m => m.id === newest.id)) return prev;
+                  return [...prev, newest];
+                });
               }
             }
           }
@@ -175,12 +184,19 @@ export default function Chat() {
 
   useEffect(() => {
     if (selectedMember) {
+      setActiveConversationId(selectedMember.id);
       const cachedThread = getCached(`thread_${user?.id}_${selectedMember.id}`);
       if (cachedThread) {
         setMessages(cachedThread);
       }
       loadMessages();
+    } else {
+      setActiveConversationId(null);
     }
+    
+    return () => {
+      setActiveConversationId(null);
+    };
   }, [selectedMember]);
 
   useEffect(() => {
@@ -358,10 +374,10 @@ export default function Chat() {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-110px)] md:h-[calc(100vh-140px)] flex flex-col md:flex-row bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden relative">
+    <div className="w-full max-w-7xl mx-auto h-[calc(100dvh-120px)] md:h-[calc(100dvh-160px)] flex flex-col md:flex-row bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden relative">
       {/* Sidebar Members List */}
-      <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col shrink-0 ${selectedMember ? 'hidden md:flex' : 'flex h-full'}`}>
-        <div className="p-4 md:p-6 border-b border-slate-100 bg-[#002B5B]">
+      <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col min-h-0 shrink-0 ${selectedMember ? 'hidden md:flex' : 'flex h-full'}`}>
+        <div className="p-4 md:p-6 border-b border-slate-100 bg-[#002B5B] shrink-0">
           <h2 className="text-lg md:text-xl font-black text-white mb-4">Messagerie</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -375,7 +391,7 @@ export default function Chat() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar overscroll-behavior-contain pb-20 md:pb-0">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-40 gap-3">
               <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
@@ -439,7 +455,7 @@ export default function Chat() {
       </div>
 
       {/* Chat Area */}
-      <div className={`flex-1 flex flex-col min-w-0 bg-slate-50/50 ${!selectedMember ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col min-h-0 min-w-0 bg-slate-50/50 ${!selectedMember ? 'hidden md:flex' : 'flex'}`}>
         {selectedMember ? (
           <>
             {/* Header */}

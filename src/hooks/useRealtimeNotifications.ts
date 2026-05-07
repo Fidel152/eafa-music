@@ -6,10 +6,20 @@ import { toast } from 'sonner';
 
 export function useRealtimeNotifications() {
   const { user } = useAuth();
-  const { sendNotification } = useNotifications();
+  const { sendNotification, playSound, activeConversationId } = useNotifications();
 
   useEffect(() => {
     if (!user) return;
+
+    // Helper for playing sound conditionally
+    const playSoundIfInactive = (convId: string | null) => {
+      // If we are currently chatting with this person/group, don't play the global notification sound
+      if (window.location.pathname === '/chat' && activeConversationId === convId) {
+        return false;
+      }
+      playSound();
+      return true;
+    };
 
     // 1. Listen for new messages - private
     const messagesChannel = supabase
@@ -23,10 +33,11 @@ export function useRealtimeNotifications() {
           filter: `receiver_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("Real-time message received:", payload);
           const newMessage = payload.new as any;
           if (!newMessage || !newMessage.sender_id) return;
           
+          const played = playSoundIfInactive(newMessage.sender_id);
+
           try {
             const { data: sender } = await supabase
               .from('members')
@@ -36,17 +47,20 @@ export function useRealtimeNotifications() {
 
             const senderName = sender?.full_name || 'Un membre';
 
-            sendNotification(`Nouveau message de ${senderName}`, {
-              body: newMessage.content || '',
-              tag: `msg-${newMessage.id}`
-            });
+            // Only show toast/native notification if sound was played (user not in active conversation)
+            if (played) {
+              sendNotification(`Nouveau message de ${senderName}`, {
+                body: newMessage.content || '',
+                tag: `msg-${newMessage.id}`
+              });
 
-            toast.info(`Message de ${senderName}`, {
-              description: (newMessage.content || '').length > 50 
-                ? (newMessage.content || '').substring(0, 50) + '...' 
-                : (newMessage.content || ''),
-              duration: 5000,
-            });
+              toast.info(`Message de ${senderName}`, {
+                description: (newMessage.content || '').length > 50 
+                  ? (newMessage.content || '').substring(0, 50) + '...' 
+                  : (newMessage.content || ''),
+                duration: 5000,
+              });
+            }
           } catch (err) {
             console.error("Error processing realtime message:", err);
           }
@@ -69,6 +83,8 @@ export function useRealtimeNotifications() {
           const isGroup = newMessage && newMessage.type && String(newMessage.type).startsWith('group');
           if (!newMessage || !isGroup || newMessage.sender_id === user.id) return;
 
+          const played = playSoundIfInactive('general');
+
           try {
             const { data: sender } = await supabase
               .from('members')
@@ -78,17 +94,19 @@ export function useRealtimeNotifications() {
 
             const senderName = sender?.full_name || 'Un membre';
 
-            sendNotification(`[GENERAL] Message de ${senderName}`, {
-              body: newMessage.content || '',
-              tag: `group-msg-${newMessage.id}`
-            });
+            if (played) {
+              sendNotification(`[GENERAL] Message de ${senderName}`, {
+                body: newMessage.content || '',
+                tag: `group-msg-${newMessage.id}`
+              });
 
-            toast.info(`Groupe Général: ${senderName}`, {
-              description: (newMessage.content || '').length > 50 
-                ? (newMessage.content || '').substring(0, 50) + '...' 
-                : (newMessage.content || ''),
-              duration: 5000,
-            });
+              toast.info(`Groupe Général: ${senderName}`, {
+                description: (newMessage.content || '').length > 50 
+                  ? (newMessage.content || '').substring(0, 50) + '...' 
+                  : (newMessage.content || ''),
+                duration: 5000,
+              });
+            }
           } catch (err) {
             console.error("Error processing group message:", err);
           }
@@ -109,6 +127,8 @@ export function useRealtimeNotifications() {
         (payload) => {
           const newAnnouncement = payload.new as any;
           if (!newAnnouncement) return;
+
+          playSound();
 
           sendNotification('Nouvelle annonce !', {
             body: newAnnouncement.title || '',
@@ -137,6 +157,8 @@ export function useRealtimeNotifications() {
           const newRehearsal = payload.new as any;
           if (!newRehearsal) return;
 
+          playSound();
+
           sendNotification('Nouvelle répétition planifiée !', {
             body: `${newRehearsal.title} - ${newRehearsal.date}`,
             tag: `reh-${newRehearsal.id}`
@@ -164,6 +186,8 @@ export function useRealtimeNotifications() {
           const newSong = payload.new as any;
           if (!newSong) return;
 
+          playSound();
+
           sendNotification('Nouveau chant ajouté !', {
             body: newSong.title,
             tag: `song-${newSong.id}`
@@ -190,6 +214,8 @@ export function useRealtimeNotifications() {
         (payload) => {
           const newInstrument = payload.new as any;
           if (!newInstrument) return;
+
+          playSound();
 
           sendNotification('Nouvel instrument ajouté !', {
             body: newInstrument.name,

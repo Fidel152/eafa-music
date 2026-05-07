@@ -118,7 +118,7 @@ const mapComment = (c: any): Comment => ({
   parentId: c.parent_id
 });
 
-const mapMessage = (m: any): Message => {
+export const mapMessage = (m: any): Message => {
   if (!m) return null as any;
   const isGroup = m.type && String(m.type).startsWith('group');
   let msgType = m.type || 'text';

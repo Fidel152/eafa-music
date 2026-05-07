@@ -6,20 +6,24 @@ interface NotificationContextType {
   requestPermission: () => Promise<void>;
   sendNotification: (title: string, options?: any) => void;
   playSound: () => void;
+  activeConversationId: string | null;
+  setActiveConversationId: (id: string | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
 
   const playSound = () => {
     try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      // Messenger-like "pop" sound
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
       audio.volume = 0.5;
-      audio.play().catch(e => console.log('Audio playback prevented by browser policy. Interaction required.', e));
+      audio.play().catch(e => console.log('Audio playback prevented by browser policy.', e));
     } catch (err) {
       console.error('Failed to play sound:', err);
     }
@@ -67,7 +71,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ permission, requestPermission, sendNotification, playSound }}>
+    <NotificationContext.Provider value={{ 
+      permission, 
+      requestPermission, 
+      sendNotification, 
+      playSound,
+      activeConversationId,
+      setActiveConversationId
+    }}>
       {children}
     </NotificationContext.Provider>
   );
