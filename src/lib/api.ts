@@ -120,12 +120,20 @@ const mapComment = (c: any): Comment => ({
 
 const mapMessage = (m: any): Message => {
   if (!m) return null as any;
+  const isGroup = m.type && String(m.type).startsWith('group');
+  let msgType = m.type || 'text';
+  
+  if (isGroup) {
+    if (msgType === 'group') msgType = 'text';
+    else if (msgType.startsWith('group_')) msgType = msgType.replace('group_', '');
+  }
+
   return {
     id: m.id,
     senderId: m.sender_id,
-    receiverId: m.receiver_id,
+    receiverId: isGroup ? 'general' : m.receiver_id,
     content: m.content || '',
-    type: m.type || 'text',
+    type: msgType as any,
     fileUrl: m.file_url,
     createdAt: m.created_at || new Date().toISOString(),
     read: !!m.read,
@@ -136,7 +144,7 @@ const mapMessage = (m: any): Message => {
 // Simple in-memory cache to improve responsiveness
 const _cache: Record<string, { data: any, timestamp: number }> = {};
 const CACHE_TTL = 180000; // 3 minutes for general data
-const SHORT_CACHE_TTL = 10000; // 10 seconds for volatile data
+const SHORT_CACHE_TTL = 1000; // 1 second for volatile data (messages)
 
 export const getCached = (key: string, ttl = CACHE_TTL) => {
   const entry = _cache[key];
@@ -207,7 +215,8 @@ export const api = {
         user: {
           id: member.id,
           displayName: member.fullName,
-          role: member.role
+          role: member.role,
+          avatarUrl: member.avatarUrl
         }
       };
     },
@@ -372,6 +381,39 @@ export const api = {
         .single();
       if (error) throw error;
       return mapAnnouncement(data);
+    },
+    trackView: async (announcementId: string, userId: string) => {
+      const { error } = await supabase
+        .from('announcement_views')
+        .upsert({ 
+          announcement_id: announcementId, 
+          user_id: userId,
+          viewed_at: new Date().toISOString()
+        }, { onConflict: 'announcement_id,user_id' });
+      
+      if (error) {
+        console.error("Announcement trackView error:", error);
+        return { success: false, error };
+      }
+      return { success: true };
+    },
+    getViewers: async (announcementId: string): Promise<any[]> => {
+      const { data, error } = await supabase
+        .from('announcement_views')
+        .select(`
+          viewed_at,
+          members:user_id (
+            full_name
+          )
+        `)
+        .eq('announcement_id', announcementId)
+        .order('viewed_at', { ascending: false });
+      
+      if (error) {
+        console.error("getViewers error:", error);
+        throw error;
+      }
+      return data || [];
     }
   },
   instruments: {
@@ -460,6 +502,39 @@ export const api = {
         .eq('id', id);
       if (error) throw error;
       return { success: true };
+    },
+    trackView: async (rehearsalId: string, userId: string) => {
+      const { error } = await supabase
+        .from('rehearsal_views')
+        .upsert({ 
+          rehearsal_id: rehearsalId, 
+          user_id: userId,
+          viewed_at: new Date().toISOString()
+        }, { onConflict: 'rehearsal_id,user_id' });
+      
+      if (error) {
+        console.error("Rehearsal trackView error:", error);
+        return { success: false, error };
+      }
+      return { success: true };
+    },
+    getViewers: async (rehearsalId: string): Promise<any[]> => {
+      const { data, error } = await supabase
+        .from('rehearsal_views')
+        .select(`
+          viewed_at,
+          members:user_id (
+            full_name
+          )
+        `)
+        .eq('rehearsal_id', rehearsalId)
+        .order('viewed_at', { ascending: false });
+      
+      if (error) {
+        console.error("getViewers rehearsal error:", error);
+        throw error;
+      }
+      return data || [];
     }
   },
   attendance: {
@@ -540,7 +615,7 @@ export const api = {
       const { data: received, error: errorReceived } = await supabase
         .from('messages')
         .select('*')
-        .eq('receiver_id', userId)
+        .or(`receiver_id.eq.${userId},type.like.group%`)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -555,44 +630,75 @@ export const api = {
       });
       
       const mapped = combined.map(m => mapMessage(m)).filter(m => m !== null);
-      setCache(cacheKey, mapped);
-      return mapped;
+      
+      // Filter for unique threads (distinct receiverId/senderId pairs)
+      const uniqueThreads: Message[] = [];
+      const threadKeys = new Set<string>();
+
+      for (const msg of mapped) {
+        const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+        const threadKey = partnerId;
+        if (!threadKeys.has(threadKey)) {
+          threadKeys.add(threadKey);
+          uniqueThreads.push(msg);
+        }
+      }
+
+      setCache(cacheKey, uniqueThreads);
+      return uniqueThreads;
     },
     listThread: async (userId: string, otherId: string): Promise<Message[]> => {
       const cacheKey = `thread_${userId}_${otherId}`;
       const cached = getCached(cacheKey, SHORT_CACHE_TTL);
       if (cached) return cached;
 
-      // Fetch last 50 messages for the thread
-      const { data: sent, error: errorSent } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('sender_id', userId)
-        .eq('receiver_id', otherId)
+      let query = supabase.from('messages').select('*');
+
+      if (otherId === 'general') {
+        // Global chat: messages with type starting with 'group'
+        query = query.like('type', 'group%');
+      } else {
+        // Private chat: messages between user and otherId
+        const { data: sent, error: errorSent } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('sender_id', userId)
+          .eq('receiver_id', otherId)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        const { data: received, error: errorReceived } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('sender_id', otherId)
+          .eq('receiver_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (errorSent) throw errorSent;
+        if (errorReceived) throw errorReceived;
+
+        const combined = [...(sent || []), ...(received || [])];
+        combined.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateA - dateB;
+        });
+        
+        const mapped = combined.map(m => mapMessage(m)).filter(m => m !== null);
+        _cache[cacheKey] = { data: mapped, timestamp: Date.now() - 50000 }; 
+        return mapped;
+      }
+
+      // Shared logic for general chat
+      const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(30);
-
-      const { data: received, error: errorReceived } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('sender_id', otherId)
-        .eq('receiver_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(30);
-
-      if (errorSent) throw errorSent;
-      if (errorReceived) throw errorReceived;
-
-      const combined = [...(sent || []), ...(received || [])];
-      combined.sort((a, b) => {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        return dateA - dateB;
-      });
+        .limit(50);
       
-      const mapped = combined.map(m => mapMessage(m)).filter(m => m !== null);
-      // Short TTL for messages thread (10s)
-      _cache[cacheKey] = { data: mapped, timestamp: Date.now() - 50000 }; 
+      if (error) throw error;
+      const reversed = (data || []).reverse();
+      const mapped = reversed.map(m => mapMessage(m)).filter(m => m !== null);
+      setCache(cacheKey, mapped);
       return mapped;
     },
     send: async (message: Partial<Message> & { type?: string, fileUrl?: string }) => {
@@ -603,9 +709,11 @@ export const api = {
       delete _cache[`thread_${message.receiverId}_${message.senderId}`];
       const dbData: any = {
         sender_id: message.senderId,
-        receiver_id: message.receiverId,
+        receiver_id: message.receiverId === 'general' ? message.senderId : message.receiverId,
         content: message.content || '',
-        type: message.type || 'text',
+        type: message.receiverId === 'general' 
+          ? (message.type === 'text' || !message.type ? 'group' : `group_${message.type}`) 
+          : (message.type || 'text'),
         file_url: message.fileUrl || null,
         read: false,
         deleted: false,

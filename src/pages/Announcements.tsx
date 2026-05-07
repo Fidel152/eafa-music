@@ -12,7 +12,8 @@ import {
   Megaphone,
   Bell,
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Users
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -26,6 +27,8 @@ export default function Announcements() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingAnnouncement, setViewingAnnouncement] = useState<Announcement | null>(null);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [loadingViewers, setLoadingViewers] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
@@ -133,8 +136,33 @@ export default function Announcements() {
     }
   };
 
-  const openView = (ann: Announcement) => {
+  const openView = async (ann: Announcement) => {
     setViewingAnnouncement(ann);
+    
+    // Always trigger tracking when opening
+    if (user) {
+      try {
+        await api.announcements.trackView(ann.id, user.id);
+        // If admin, reload viewers after tracking to see own view or latest state
+        if (isAdmin) {
+          loadViewers(ann.id);
+        }
+      } catch (error) {
+        console.error("Tracking error:", error);
+      }
+    }
+  };
+
+  const loadViewers = async (annId: string) => {
+    setLoadingViewers(true);
+    try {
+      const data = await api.announcements.getViewers(annId);
+      setViewers(data || []);
+    } catch (e) {
+      console.error("Load viewers error:", e);
+    } finally {
+      setLoadingViewers(false);
+    }
   };
 
   const closeModal = () => {
@@ -444,6 +472,35 @@ export default function Announcements() {
 
                 {/* Comment Section */}
                 <CommentSection targetId={viewingAnnouncement.id} targetType="announcement" />
+
+                {isAdmin && (
+                  <div className="mt-12 pt-8 border-t border-slate-100">
+                    <h4 className="text-sm font-black text-[#002B5B] uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Users size={16} className="text-[#D4AF37]" />
+                      Membres ayant vu cette annonce ({viewers.length})
+                    </h4>
+                    
+                    {loadingViewers ? (
+                      <div className="flex items-center gap-2 text-slate-400 text-xs italic">
+                        <div className="w-3 h-3 border-2 border-[#D4AF37] border-t-transparent animate-spin rounded-full" />
+                        Chargement des lecteurs...
+                      </div>
+                    ) : viewers.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {viewers.map((v, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="text-sm font-bold text-[#002B5B]">{v.members?.full_name || 'Membre inconnu'}</span>
+                            <span className="text-[10px] text-slate-400 font-medium font-mono">
+                              {format(new Date(v.viewed_at), 'dd/MM HH:mm')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 text-xs italic">Personne n'a encore vu cette annonce.</p>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-12 pt-8 border-t border-slate-100 flex justify-center">
                   <button 

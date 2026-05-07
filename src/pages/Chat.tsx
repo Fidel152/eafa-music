@@ -3,7 +3,7 @@ import { api, getCached } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Member, Message } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { Search, Send, User, Clock, Phone, Mail, Image as ImageIcon, CheckCircle2, ChevronLeft, Trash2, Info, Paperclip, Mic, Video, Camera, MoreVertical, X, Play, Volume2 } from 'lucide-react';
+import { Search, Send, User, Clock, Phone, Mail, Image as ImageIcon, CheckCircle2, ChevronLeft, Trash2, Info, Paperclip, Mic, Video, Camera, MoreVertical, X, Play, Volume2, Smile, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -21,6 +21,10 @@ export default function Chat() {
   const [loading, setLoading] = useState(!getCached('members_list') && !getCached(`convs_${user?.id}`));
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showMediaOptions, setShowMediaOptions] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -103,11 +107,38 @@ export default function Chat() {
           const newest = payload.new as any;
           if (!newest) return;
           
-          // If message involves current user
-          if (newest.sender_id === user.id || newest.receiver_id === user.id) {
+          // If message involves current user or is a group message
+          const isMe = newest.sender_id === user.id || newest.receiver_id === user.id;
+          const isGroup = newest.type && String(newest.type).startsWith('group');
+
+          if (isMe || isGroup) {
             loadConversations();
             // If message is from/to currently selected conversation
-            if (selectedMember && (newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id)) {
+            if (selectedMember) {
+              const isGroupThread = selectedMember.id === 'general' && newest.type && String(newest.type).startsWith('group');
+              const isPrivateThread = newest.sender_id === selectedMember.id || newest.receiver_id === selectedMember.id;
+              
+              if (isGroupThread || isPrivateThread) {
+                loadMessages();
+              }
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated && selectedMember) {
+            const isGroupThread = selectedMember.id === 'general' && updated.type && String(updated.type).startsWith('group');
+            const isPrivateThread = updated.sender_id === selectedMember.id || updated.receiver_id === selectedMember.id;
+            
+            if (isGroupThread || isPrivateThread) {
               loadMessages();
             }
           }
@@ -115,8 +146,20 @@ export default function Chat() {
       )
       .subscribe();
 
+    // Typing activity subscription
+    const typingChannel = supabase
+      .channel(`typing-${selectedMember?.id || 'none'}`)
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload.userId !== user.id) {
+          setOtherUserTyping(true);
+          setTimeout(() => setOtherUserTyping(false), 3000);
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(typingChannel);
     };
   }, [user, selectedMember]); 
 
@@ -147,7 +190,21 @@ export default function Chat() {
   const loadMembers = async () => {
     try {
       const data = await api.members.list();
-      setMembers(data.filter(m => m.id !== user?.id));
+      const filtered = data.filter(m => m.id !== user?.id);
+      
+      // Add General Group at the beginning
+      const generalGroup: any = {
+        id: 'general',
+        fullName: 'Groupe Général',
+        role: 'member',
+        avatarUrl: null,
+        voiceType: 'Tout le monde',
+        joinedAt: new Date().toISOString(),
+        active: true,
+        isGroup: true
+      };
+      
+      setMembers([generalGroup, ...filtered]);
     } catch (error) {
       console.error("Load members chat error:", error);
     } finally {
@@ -156,6 +213,7 @@ export default function Chat() {
   };
 
   const getUnreadStatus = (memberId: string) => {
+    if (memberId === 'general') return false; // General group unread logic can be complex, skip for now
     const conv = conversations.find(c => 
       (c.senderId === memberId && c.receiverId === user?.id)
     );
@@ -168,8 +226,9 @@ export default function Chat() {
     try {
       const data = await api.messages.listThread(user.id, selectedMember.id);
       setMessages(data || []);
-      // Mark as read
-      api.messages.markAsRead(user.id, selectedMember.id).catch(console.error);
+      if (selectedMember.id !== 'general') {
+        api.messages.markAsRead(user.id, selectedMember.id).catch(console.error);
+      }
     } catch (error) {
       console.error("Load messages error:", error);
       setMessages([]);
@@ -276,6 +335,24 @@ export default function Chat() {
     return now.getTime() - seen.getTime() < 120000;
   };
 
+  const handleTyping = () => {
+    if (!selectedMember || selectedMember.id === 'general') return;
+    
+    // Broadcast typing event
+    supabase.channel(`typing-${user?.id}`).send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: user?.id }
+    });
+  };
+
+  const addEmoji = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojis(false);
+  };
+
+  const EMOJIS = ['❤️', '🙌', '🔥', '✨', '🙏', '🎵', '🎹', '🎸', '🥁', '🎤', '😂', '😍', '👍', '👏', '⭐', '💯'];
+
   const filteredMembers = members.filter(m => 
     m.fullName.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -322,7 +399,11 @@ export default function Chat() {
                 >
                   <div className="relative shrink-0">
                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-slate-100 border-2 ${isSelected ? 'border-[#D4AF37]' : 'border-white'} shadow-sm flex items-center justify-center`}>
-                      {m.avatarUrl ? (
+                      {m.id === 'general' ? (
+                        <div className="bg-[#002B5B] w-full h-full flex items-center justify-center text-[#D4AF37]">
+                          <Users size={20} />
+                        </div>
+                      ) : m.avatarUrl ? (
                         <img src={m.avatarUrl} alt={m.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
                         <span className="text-[#002B5B] font-black text-sm md:text-base">{m.fullName.charAt(0)}</span>
@@ -372,13 +453,15 @@ export default function Chat() {
                 </button>
                 <div className="relative shrink-0">
                   <div className="w-9 h-9 md:w-11 md:h-11 rounded-full overflow-hidden bg-[#002B5B] flex items-center justify-center text-[#D4AF37] font-black border-2 border-slate-100 shadow-sm">
-                    {selectedMember.avatarUrl ? (
+                    {selectedMember.id === 'general' ? (
+                      <Users size={20} />
+                    ) : selectedMember.avatarUrl ? (
                       <img src={selectedMember.avatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       selectedMember.fullName.charAt(0)
                     )}
                   </div>
-                  {isOnline(selectedMember.lastSeen) && (
+                  {selectedMember.id !== 'general' && isOnline(selectedMember.lastSeen) && (
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
                   )}
                 </div>
@@ -386,7 +469,7 @@ export default function Chat() {
                   <h3 className="font-black text-[#002B5B] text-sm md:text-base leading-tight truncate">{selectedMember.fullName}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      {isOnline(selectedMember.lastSeen) ? 'En ligne' : `Dernier passage à ${(() => {
+                      {selectedMember.id === 'general' ? 'Tout le monde est ici' : isOnline(selectedMember.lastSeen) ? 'En ligne' : `Dernier passage à ${(() => {
                         try {
                           return format(new Date(selectedMember.lastSeen || Date.now()), 'HH:mm');
                         } catch (e) {
@@ -418,42 +501,53 @@ export default function Chat() {
                 </div>
               ) : (
                 <AnimatePresence initial={false}>
-                  {(messages || []).map((msg, index) => {
-                    if (!msg) return null;
-                    const isMe = msg.senderId === user?.id;
-                    const prevMsg = index > 0 ? messages[index - 1] : null;
-                    const showAvatar = !isMe && (!prevMsg || prevMsg.senderId !== msg.senderId);
+                      {(messages || []).map((msg, index) => {
+                        if (!msg) return null;
+                        const isMe = msg.senderId === user?.id;
+                        const prevMsg = index > 0 ? messages[index - 1] : null;
+                        const showAvatar = !isMe && (!prevMsg || prevMsg.senderId !== msg.senderId);
+                        
+                        // For group chat, we need to find the actual sender info
+                        const sender = selectedMember.id === 'general' 
+                          ? members.find(m => m.id === msg.senderId)
+                          : selectedMember;
 
-                    return (
-                      <motion.div
-                          key={msg.id}
-                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}
-                        >
-                        {!isMe && showAvatar && (
-                          <div className="w-8 h-8 rounded-full bg-[#002B5B] overflow-hidden flex items-center justify-center text-[#D4AF37] text-[10px] font-black shrink-0 shadow-sm">
-                            {selectedMember.avatarUrl ? (
-                              <img src={selectedMember.avatarUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              selectedMember.fullName.charAt(0)
+                        return (
+                          <motion.div
+                              key={msg.id}
+                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}
+                            >
+                            {!isMe && showAvatar && (
+                              <div className="w-8 h-8 rounded-full bg-[#002B5B] overflow-hidden flex items-center justify-center text-[#D4AF37] text-[10px] font-black shrink-0 shadow-sm" title={sender?.fullName}>
+                                {sender?.avatarUrl ? (
+                                  <img src={sender.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  sender?.fullName.charAt(0) || '?'
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                        {!isMe && !showAvatar && <div className="w-8 shrink-0" />}
-                        <div 
-                          onClick={() => setSelectedMessage(msg)}
-                          className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 md:p-4 shadow-sm relative cursor-pointer active:scale-[0.98] transition-transform ${
-                          isMe 
-                            ? 'bg-[#002B5B] text-white rounded-br-none' 
-                            : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                        } ${msg.deleted ? 'opacity-50 italic' : ''}`}>
-                          
-                          {!msg.deleted ? (
-                            <>
-                              {msg.type === 'text' && <p className="text-sm md:text-base leading-relaxed font-medium">{msg.content}</p>}
+                            {!isMe && !showAvatar && <div className="w-8 shrink-0" />}
+                            <div 
+                              onClick={() => setSelectedMessage(msg)}
+                              className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 md:p-4 shadow-sm relative cursor-pointer active:scale-[0.98] transition-transform ${
+                              isMe 
+                                ? 'bg-[#002B5B] text-white rounded-br-none' 
+                                : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
+                            } ${msg.deleted ? 'opacity-50 italic' : ''}`}>
                               
-                              {(msg.type === 'image' || msg.type === 'photo') && (
+                              {!msg.deleted ? (
+                                <>
+                                  {sender && selectedMember.id === 'general' && !isMe && showAvatar && (
+                                    <p className="text-[10px] font-black text-[#D4AF37] mb-1 uppercase tracking-tight">{sender.fullName}</p>
+                                  )}
+                                  {/* Render content if it's a text-based message or if type is unknown */}
+                                  {(msg.type === 'text' || msg.type === 'group' || !['image', 'photo', 'audio', 'video', 'file'].includes(msg.type)) && msg.content && (
+                                    <p className="text-sm md:text-base leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
+                                  )}
+                                  
+                                  {(msg.type === 'image' || msg.type === 'photo') && (
                                 <div className="rounded-xl overflow-hidden mb-1">
                                   <img src={msg.fileUrl} alt="Attachement" className="max-w-full h-auto max-h-80 object-contain rounded-lg" />
                                 </div>
@@ -514,11 +608,45 @@ export default function Chat() {
                 </AnimatePresence>
               )}
               <div ref={messagesEndRef} />
+              
+              {otherUserTyping && selectedMember.id !== 'general' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-slate-400 italic text-[10px] font-bold"
+                >
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  {selectedMember.fullName} est en train d'écrire...
+                </motion.div>
+              )}
             </div>
 
             {/* New Message Input */}
             <div className="p-3 md:p-6 bg-white border-t border-slate-100 relative">
               <AnimatePresence>
+                {showEmojis && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: -10, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                    className="absolute bottom-full left-4 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 grid grid-cols-4 md:grid-cols-8 gap-2 z-50 mb-2"
+                  >
+                    {EMOJIS.map(e => (
+                      <button 
+                        key={e}
+                        type="button"
+                        onClick={() => addEmoji(e)}
+                        className="text-2xl hover:scale-125 transition-transform p-2 bg-slate-50 rounded-lg hover:bg-[#D4AF37]/10"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
                 {showMediaOptions && (
                   <motion.div 
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
@@ -559,6 +687,14 @@ export default function Chat() {
                   <Paperclip size={20} className="md:w-6 md:h-6" />
                 </button>
 
+                <button 
+                  type="button"
+                  onClick={() => setShowEmojis(!showEmojis)}
+                  className={`shrink-0 p-2.5 md:p-4 rounded-xl md:rounded-2xl transition-all ${showEmojis ? 'bg-[#D4AF37] text-[#002B5B]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  <Smile size={20} className="md:w-6 md:h-6" />
+                </button>
+
                 {isRecording ? (
                   <div className="flex-1 flex items-center gap-2 md:gap-4 bg-red-50 p-2 md:p-3 rounded-xl md:rounded-2xl border border-red-100 min-w-0">
                     <div className="w-3 h-3 md:w-4 md:h-4 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)] shrink-0" />
@@ -577,7 +713,10 @@ export default function Chat() {
                       type="text"
                       placeholder="Message..."
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={(e) => {
+                        setNewMessage(e.target.value);
+                        handleTyping();
+                      }}
                       className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-sm md:text-base outline-none font-medium text-[#002B5B]"
                     />
                     

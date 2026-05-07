@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Music2, User } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
+  const { requestPermission } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const navigate = useNavigate();
@@ -22,6 +24,11 @@ export default function Login() {
     try {
       const result = await login(name.trim());
       if (result.success) {
+        // Request notification permission after successful login
+        setTimeout(() => {
+          requestPermission().catch(console.error);
+        }, 1000);
+
         if (result.role === 'admin') {
           toast.success(`Bienvenue Administrateur ${name}!`);
         } else {

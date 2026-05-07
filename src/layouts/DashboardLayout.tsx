@@ -244,8 +244,12 @@ export default function DashboardLayout() {
                   {user?.role === 'admin' ? 'Admin' : 'Membre'}
                 </p>
               </div>
-              <div className="h-10 w-10 bg-[#002B5B] rounded-xl flex items-center justify-center text-[#D4AF37] font-black group-hover:scale-105 transition-all shadow-md shadow-[#002B5B]/10">
-                {user?.displayName?.[0] || <UserIcon size={20} />}
+              <div className="h-10 w-10 bg-[#002B5B] rounded-xl flex items-center justify-center text-[#D4AF37] font-black group-hover:scale-105 transition-all shadow-md shadow-[#002B5B]/10 overflow-hidden">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user?.displayName?.[0] || <UserIcon size={20} />
+                )}
               </div>
               <ChevronDown size={16} className="text-slate-400 group-hover:text-[#002B5B] transition-all" />
             </Link>
@@ -353,8 +357,12 @@ export default function DashboardLayout() {
                   </button>
 
                   <div className="bg-white/5 p-5 rounded-[2rem] flex items-center gap-4 mb-2">
-                    <div className="h-12 w-12 bg-[#D4AF37] rounded-2xl flex items-center justify-center text-[#002B5B] font-black text-xl">
-                      {user?.displayName?.[0] || 'U'}
+                    <div className="h-12 w-12 bg-[#D4AF37] rounded-2xl flex items-center justify-center text-[#002B5B] font-black text-xl overflow-hidden">
+                      {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        user?.displayName?.[0] || 'U'
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-black truncate uppercase text-sm">{user?.displayName || 'Utilisateur'}</p>

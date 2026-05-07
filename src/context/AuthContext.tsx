@@ -64,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: response.user.id,
           displayName: response.user.displayName,
           role: response.user.role as UserRole,
+          avatarUrl: response.user.avatarUrl,
         };
         localStorage.setItem('app_user', JSON.stringify(user));
         setState({ user, loading: false });

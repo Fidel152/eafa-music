@@ -92,6 +92,7 @@ export interface AuthState {
     email?: string | null;
     displayName?: string | null;
     role: UserRole;
+    avatarUrl?: string | null;
   } | null;
   loading: boolean;
   memberData?: Member | null;
